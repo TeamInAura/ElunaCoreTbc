@@ -2420,7 +2420,7 @@ void Player::GiveLevel(uint32 level)
     if (MailLevelReward const* mailReward = sObjectMgr.GetMailLevelReward(level, getRaceMask()))
         MailDraft(mailReward->mailTemplateId).SendMailTo(this, MailSender(MAIL_CREATURE, mailReward->senderEntry));
 
-    sScriptMgr.OnLevelChanged(this, oldLevel);
+    sScriptMgr.OnLevelChange(this, oldLevel);
 }
 
 void Player::SetFreeTalentPoints(uint32 points)
@@ -20713,7 +20713,7 @@ void Player::_SaveBGData()
 
 void Player::ModifyMoney(int32 d)
 {
-    sScriptMgr.OnMoneyChanged(this, d);
+    sScriptMgr.OnMoneyChange(this, d);
 
     if (d < 0)
         SetMoney(GetMoney() > uint32(-d) ? GetMoney() + d : 0);
