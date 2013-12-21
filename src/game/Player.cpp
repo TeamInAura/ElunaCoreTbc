@@ -1287,7 +1287,7 @@ void Player::Update(uint32 update_diff, uint32 p_time)
         if (update_diff >= m_nextSave)
         {
             // m_nextSave reseted in SaveToDB call
-            sHookMgr.OnSave(this);
+            sScriptMgr.OnSave(this);
             SaveToDB();
             DETAIL_LOG("Player '%s' (GUID: %u) saved", GetName(), GetGUIDLow());
         }
@@ -2319,7 +2319,7 @@ void Player::GiveXP(uint32 xp, Unit* victim)
 
     uint32 level = getLevel();
 
-    sHookMgr.OnGiveXP(this, xp, victim);
+    sScriptMgr.OnGiveXP(this, xp, victim);
 
     // XP to money conversion processed in Player::RewardQuest
     if (level >= sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL))
@@ -2420,12 +2420,12 @@ void Player::GiveLevel(uint32 level)
     if (MailLevelReward const* mailReward = sObjectMgr.GetMailLevelReward(level, getRaceMask()))
         MailDraft(mailReward->mailTemplateId).SendMailTo(this, MailSender(MAIL_CREATURE, mailReward->senderEntry));
 
-    sHookMgr.OnLevelChanged(this, oldLevel);
+    sScriptMgr.OnLevelChanged(this, oldLevel);
 }
 
 void Player::SetFreeTalentPoints(uint32 points)
 {
-    sHookMgr.OnFreeTalentPointsChanged(this, points);
+    sScriptMgr.OnTalentsChange(this, points);
     SetUInt32Value(PLAYER_CHARACTER_POINTS1, points);
 }
 
@@ -3503,7 +3503,7 @@ uint32 Player::resetTalentsCost() const
 
 bool Player::resetTalents(bool no_cost)
 {
-    sHookMgr.OnTalentsReset(this, no_cost);
+    sScriptMgr.OnTalentsReset(this, no_cost);
 
     // not need after this call
     if (HasAtLoginFlag(AT_LOGIN_RESET_TALENTS))
@@ -6429,7 +6429,7 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
         }
     }
 
-    sHookMgr.OnUpdateZone(this, newZone, newArea);
+    sScriptMgr.OnUpdateZone(this, newZone, newArea);
 
     m_zoneUpdateId    = newZone;
     m_zoneUpdateTimer = ZONE_UPDATE_INTERVAL;
@@ -6563,7 +6563,7 @@ void Player::DuelComplete(DuelCompleteType type)
         SendMessageToSet(&data, true);
     }
 
-    sHookMgr.OnDuelEnd(duel->opponent, this, type);
+    sScriptMgr.OnDuelEnd(duel->opponent, this, type);
 
     // Remove Duel Flag object
     if (GameObject* obj = GetMap()->GetGameObject(GetGuidValue(PLAYER_DUEL_ARBITER)))
@@ -10630,11 +10630,11 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
 
-        sHookMgr.OnEquip(this, pItem2, bag, slot);
+        sScriptMgr.OnEquip(this, pItem2, bag, slot);
         return pItem2;
     }
 
-    sHookMgr.OnEquip(this, pItem, bag, slot);
+    sScriptMgr.OnEquip(this, pItem, bag, slot);
 
     return pItem;
 }
@@ -15974,7 +15974,7 @@ InstancePlayerBind* Player::BindToInstance(DungeonPersistentState* state, bool p
         if (!load)
             DEBUG_LOG("Player::BindToInstance: %s(%d) is now bound to map %d, instance %d, difficulty %d",
                       GetName(), GetGUIDLow(), state->GetMapId(), state->GetInstanceId(), state->GetDifficulty());
-        sHookMgr.OnBindToInstance(this, state->GetDifficulty(), state->GetMapId(), permanent);
+        sScriptMgr.OnBindToInstance(this, state->GetDifficulty(), state->GetMapId(), permanent);
         return &bind;
     }
     else
@@ -17160,7 +17160,7 @@ void Player::UpdateDuelFlag(time_t currTime)
     if (!duel || duel->startTimer == 0 || currTime < duel->startTimer + 3)
         return;
 
-    sHookMgr.OnDuelStart(this, duel->opponent);
+    sScriptMgr.OnDuelStart(this, duel->opponent);
 
     SetUInt32Value(PLAYER_DUEL_TEAM, 1);
     duel->opponent->SetUInt32Value(PLAYER_DUEL_TEAM, 2);
@@ -20713,7 +20713,7 @@ void Player::_SaveBGData()
 
 void Player::ModifyMoney(int32 d)
 {
-    sHookMgr.OnMoneyChanged(this, d);
+    sScriptMgr.OnMoneyChanged(this, d);
 
     if (d < 0)
         SetMoney(GetMoney() > uint32(-d) ? GetMoney() + d : 0);

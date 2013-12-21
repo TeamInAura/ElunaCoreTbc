@@ -385,7 +385,7 @@ void WorldSession::HandleCharCreateOpcode(WorldPacket& recv_data)
     BASIC_LOG("Account: %d (IP: %s) Create Character:[%s] (guid: %u)", GetAccountId(), IP_str.c_str(), name.c_str(), pNewChar->GetGUIDLow());
     sLog.outChar("Account: %d (IP: %s) Create Character:[%s] (guid: %u)", GetAccountId(), IP_str.c_str(), name.c_str(), pNewChar->GetGUIDLow());
 
-    sHookMgr.OnCreate(pNewChar);
+    sScriptMgr.OnCharacterCreate(pNewChar);
 
     delete pNewChar;                                        // created only to call SaveToDB()
 }
@@ -439,7 +439,7 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recv_data)
     BASIC_LOG("Account: %d (IP: %s) Delete Character:[%s] (guid: %u)", GetAccountId(), IP_str.c_str(), name.c_str(), lowguid);
     sLog.outChar("Account: %d (IP: %s) Delete Character:[%s] (guid: %u)", GetAccountId(), IP_str.c_str(), name.c_str(), lowguid);
 
-    sHookMgr.OnDelete(lowguid);
+    sScriptMgr.OnCharacterDelete(lowguid);
 
     if (sLog.IsOutCharDump())                               // optimize GetPlayerDump call
     {
@@ -692,7 +692,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     }
 
     if (pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST))
-        sHookMgr.OnFirstLogin(pCurrChar);
+        sScriptMgr.OnFirstLogin(pCurrChar);
 
     if (pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST))
         pCurrChar->RemoveAtLoginFlag(AT_LOGIN_FIRST);
@@ -724,7 +724,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 
     m_playerLoading = false;
 
-    sHookMgr.OnLogin(pCurrChar);
+    sScriptMgr.OnLogin(pCurrChar);
 
     delete holder;
 }

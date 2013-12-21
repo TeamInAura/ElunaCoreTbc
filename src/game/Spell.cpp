@@ -2905,7 +2905,7 @@ void Spell::cast(bool skipCheck)
     m_targets.updateTradeSlotItem();
 
     if (m_caster->GetTypeId() == TYPEID_PLAYER)
-        sHookMgr.OnSpellCast(m_caster->ToPlayer(), this, skipCheck);
+        sScriptMgr.OnSpellCast(m_caster->ToPlayer(), this, skipCheck);
 
     FillTargetMap();
 

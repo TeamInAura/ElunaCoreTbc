@@ -797,7 +797,7 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
         if (Creature* killer = ToCreature())
         {
             if (Player* killed = pVictim->ToPlayer())
-                sHookMgr.OnPlayerKilledByCreature(killer, killed);
+                sScriptMgr.OnKilledByCreature(killer, killed);
         }
 
         // Call AI OwnerKilledUnit (for any current summoned minipet/guardian/protector)
@@ -855,7 +855,7 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
                         outdoorPvP->HandlePlayerKill(player_tap, playerVictim);
                 }
 
-                sHookMgr.OnPVPKill(player_tap, playerVictim);
+                sScriptMgr.OnKillPlayer(player_tap, playerVictim);
             }
         }
         else                                                // Killed creature
@@ -1095,7 +1095,7 @@ void Unit::JustKilledCreature(Creature* victim, Player* responsiblePlayer)
         if (BattleGround* bg = responsiblePlayer->GetBattleGround())
             bg->HandleKillUnit(victim, responsiblePlayer);
 
-        sHookMgr.OnCreatureKill(responsiblePlayer, victim);
+        sScriptMgr.OnKillCreature(responsiblePlayer, victim);
     }
     // Notify the outdoor pvp script
     if (OutdoorPvP* outdoorPvP = sOutdoorPvPMgr.GetScript(responsiblePlayer ? responsiblePlayer->GetCachedZoneId() : GetZoneId()))
@@ -6960,7 +6960,7 @@ void Unit::SetInCombatState(bool PvP, Unit* enemy)
     }
 
     if (GetTypeId() == TYPEID_PLAYER)
-        sHookMgr.OnPlayerEnterCombat(ToPlayer(), enemy);
+        sScriptMgr.OnEnterCombat(ToPlayer(), enemy);
 }
 
 void Unit::ClearInCombat()
@@ -6972,7 +6972,7 @@ void Unit::ClearInCombat()
         RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PET_IN_COMBAT);
 
     if (GetTypeId() == TYPEID_PLAYER)
-        sHookMgr.OnPlayerLeaveCombat(ToPlayer());
+        sScriptMgr.OnLeaveCombat(ToPlayer());
 
     // Player's state will be cleared in Player::UpdateContestedPvP
     if (GetTypeId() == TYPEID_UNIT)
