@@ -1996,6 +1996,9 @@ uint32 ScriptMgr::GetEventIdScriptId(uint32 eventId) const
     return 0;
 }
 
+// Left here for reference
+// Remove when hooks are rewritten and eluna hooks implemented
+/*
 CreatureAI* ScriptMgr::GetCreatureAI(Creature* pCreature)
 {
     if (CreatureAI* luaAI = sHookMgr.GetAI(pCreature))
@@ -2202,6 +2205,7 @@ bool ScriptMgr::OnProcessEvent(uint32 eventId, Object* pSource, Object* pTarget,
 {
     return NULL;
 }
+*/
 
 void ScriptMgr::OnCharacterCreate(Player* player)
 {
@@ -2416,12 +2420,7 @@ void ScriptMgr::LoadScriptLibrary()
 {
     UnloadScriptLibrary();
     // AddScripts();
-
-    // Remove these
-    m_pOnProcessEvent = NULL;
-    m_pGetCreatureAI = NULL;
-    m_pGetGameObjectAI = NULL;
-    m_pCreateInstanceData = NULL;
+    // AddElunaScripts();
 }
 
 void ScriptMgr::UnloadScriptLibrary()
