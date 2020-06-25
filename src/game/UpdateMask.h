@@ -19,14 +19,13 @@
 #ifndef __UPDATEMASK_H
 #define __UPDATEMASK_H
 
-#include "UpdateFields.h"
 #include "Errors.h"
 
 class UpdateMask
 {
     public:
-        UpdateMask() : mCount(0), mBlocks(0), mUpdateMask(0) { }
-        UpdateMask(const UpdateMask& mask) : mUpdateMask(0) { *this = mask; }
+        UpdateMask() : mCount(0), mBlocks(0), mUpdateMask(nullptr) { }
+        UpdateMask(const UpdateMask& mask) : mUpdateMask(nullptr) { *this = mask; }
 
         ~UpdateMask()
         {
@@ -40,7 +39,7 @@ class UpdateMask
 
         void UnsetBit(uint32 index)
         {
-            ((uint8*)mUpdateMask)[ index >> 3 ] &= (0xff ^(1 << (index & 0x7)));
+            ((uint8*)mUpdateMask)[ index >> 3 ] &= (0xff ^ (1 << (index & 0x7)));
         }
 
         bool GetBit(uint32 index) const

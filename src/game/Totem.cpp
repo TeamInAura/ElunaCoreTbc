@@ -17,16 +17,15 @@
  */
 
 #include "Totem.h"
-#include "WorldPacket.h"
 #include "Log.h"
 #include "Group.h"
 #include "Player.h"
 #include "ObjectMgr.h"
 #include "SpellMgr.h"
 #include "DBCStores.h"
-#include "CreatureAI.h"
+#include "AI/CreatureAI.h"
 #include "InstanceData.h"
-#include "HookMgr.h"
+#include "LuaEngine.h"
 
 Totem::Totem() : Creature(CREATURE_SUBTYPE_TOTEM)
 {
@@ -67,6 +66,10 @@ bool Totem::Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* 
 
     LoadCreatureAddon(false);
 
+    SetCanDodge(false);
+    SetCanParry(false);
+    SetCanBlock(false);
+
     return true;
 }
 
@@ -92,16 +95,16 @@ void Totem::Update(uint32 update_diff, uint32 time)
 
 void Totem::Summon(Unit* owner)
 {
-    AIM_Initialize();
     owner->GetMap()->Add((Creature*)this);
+    AIM_Initialize();
 
     WorldPacket data(SMSG_GAMEOBJECT_SPAWN_ANIM_OBSOLETE, 8);
     data << GetObjectGuid();
-    SendMessageToSet(&data, true);
+    SendMessageToSet(data, true);
 
-    if (owner->GetTypeId() == TYPEID_UNIT && ((Creature*)owner)->AI())
-        ((Creature*)owner)->AI()->JustSummoned((Creature*)this);
-    sHookMgr.OnSummoned(this, owner);
+    if (owner->AI())
+        owner->AI()->JustSummoned((Creature*)this);
+    sEluna->OnSummoned(this, owner);
 
     // there are some totems, which exist just for their visual appeareance
     if (!GetSpell())
@@ -110,10 +113,10 @@ void Totem::Summon(Unit* owner)
     switch (m_type)
     {
         case TOTEM_PASSIVE:
-            CastSpell(this, GetSpell(), true);
+            CastSpell(this, GetSpell(), TRIGGERED_OLD_TRIGGERED);
             break;
         case TOTEM_STATUE:
-            CastSpell(GetOwner(), GetSpell(), true);
+            CastSpell(GetOwner(), GetSpell(), TRIGGERED_OLD_TRIGGERED);
             break;
         default: break;
     }
@@ -137,7 +140,7 @@ void Totem::UnSummon()
             // Not only the player can summon the totem (scripted AI)
             if (Group* pGroup = ((Player*)owner)->GetGroup())
             {
-                for (GroupReference* itr = pGroup->GetFirstMember(); itr != NULL; itr = itr->next())
+                for (GroupReference* itr = pGroup->GetFirstMember(); itr != nullptr; itr = itr->next())
                 {
                     Player* Target = itr->getSource();
                     if (Target && pGroup->SameSubGroup((Player*)owner, Target))
@@ -146,8 +149,8 @@ void Totem::UnSummon()
             }
         }
 
-        if (owner->GetTypeId() == TYPEID_UNIT && ((Creature*)owner)->AI())
-            ((Creature*)owner)->AI()->SummonedCreatureDespawn((Creature*)this);
+        if (owner->AI())
+            owner->AI()->SummonedCreatureDespawn((Creature*)this);
     }
 
     // any totem unsummon look like as totem kill, req. for proper animation
@@ -165,18 +168,18 @@ void Totem::SetOwner(Unit* owner)
     SetLevel(owner->getLevel());
 }
 
-Unit* Totem::GetOwner()
+Unit* Totem::GetOwner() const
 {
     if (ObjectGuid ownerGuid = GetOwnerGuid())
         return ObjectAccessor::GetUnit(*this, ownerGuid);
 
-    return NULL;
+    return nullptr;
 }
 
 void Totem::SetTypeBySummonSpell(SpellEntry const* spellProto)
 {
     // Get spell casted by totem
-    SpellEntry const* totemSpell = sSpellStore.LookupEntry(GetSpell());
+    SpellEntry const* totemSpell = sSpellTemplate.LookupEntry<SpellEntry>(GetSpell());
     if (totemSpell)
     {
         // If spell have cast time -> so its active totem
@@ -189,22 +192,16 @@ void Totem::SetTypeBySummonSpell(SpellEntry const* spellProto)
 
 bool Totem::IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const
 {
-    // Check for Mana Spring & Healing Stream totems
-    switch (spellInfo->SpellFamilyName)
-    {
-        case SPELLFAMILY_SHAMAN:
-            if (spellInfo->IsFitToFamilyMask(UI64LIT(0x00000002000)) ||
-                    spellInfo->IsFitToFamilyMask(UI64LIT(0x00000004000)))
-                return false;
-            break;
-        default:
-            break;
-    }
+    // Totem may affected by some specific spells
+    // Mana Spring, Healing stream, Mana tide
+    // Flags : 0x00000002000 | 0x00000004000 | 0x00004000000 -> 0x00004006000
+    if (spellInfo->SpellFamilyName == SPELLFAMILY_SHAMAN && spellInfo->IsFitToFamilyMask(uint64(0x00004006000)))
+        return false;
 
     switch (spellInfo->Effect[index])
     {
         case SPELL_EFFECT_ATTACK_ME:
-            // immune to any type of regeneration effects hp/mana etc.
+        // immune to any type of regeneration effects hp/mana etc.
         case SPELL_EFFECT_HEAL:
         case SPELL_EFFECT_HEAL_MAX_HEALTH:
         case SPELL_EFFECT_HEAL_MECHANICAL:

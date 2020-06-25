@@ -18,9 +18,7 @@
 
 #include "HomeMovementGenerator.h"
 #include "Creature.h"
-#include "CreatureAI.h"
-#include "ObjectMgr.h"
-#include "WorldPacket.h"
+#include "AI/CreatureAI.h"
 #include "movement/MoveSplineInit.h"
 #include "movement/MoveSpline.h"
 
@@ -41,12 +39,10 @@ void HomeMovementGenerator<Creature>::_setTargetLocation(Creature& owner)
     Movement::MoveSplineInit init(owner);
     float x, y, z, o;
     // at apply we can select more nice return points base at current movegen
-    if (owner.GetMotionMaster()->empty() || !owner.GetMotionMaster()->top()->GetResetPosition(owner, x, y, z))
-    {
+    if (owner.GetMotionMaster()->empty() || !owner.GetMotionMaster()->top()->GetResetPosition(owner, x, y, z, o))
         owner.GetRespawnCoord(x, y, z, &o);
-        init.SetFacing(o);
-    }
 
+    init.SetFacing(o);
     init.MoveTo(x, y, z, true);
     init.SetWalk(false);
     init.Launch();
@@ -55,7 +51,7 @@ void HomeMovementGenerator<Creature>::_setTargetLocation(Creature& owner)
     owner.clearUnitState(UNIT_STAT_ALL_DYN_STATES);
 }
 
-bool HomeMovementGenerator<Creature>::Update(Creature& owner, const uint32& time_diff)
+bool HomeMovementGenerator<Creature>::Update(Creature& owner, const uint32& /*time_diff*/)
 {
     arrived = owner.movespline->Finalized();
     return !arrived;

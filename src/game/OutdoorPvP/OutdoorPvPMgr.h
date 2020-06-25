@@ -20,7 +20,6 @@
 #define WORLD_PVP_MGR_H
 
 #include "Common.h"
-#include "Policies/Singleton.h"
 #include "Timer.h"
 
 enum
@@ -82,7 +81,6 @@ struct CapturePointSlider
     bool IsLocked;
 };
 
-// forward declaration
 class Player;
 class GameObject;
 class Creature;

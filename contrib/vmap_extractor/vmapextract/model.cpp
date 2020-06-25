@@ -24,7 +24,7 @@
 #include <algorithm>
 #include <cstdio>
 
-Model::Model(std::string& filename) : filename(filename), vertices(0), indices(0)
+Model::Model(std::string& filename) : filename(filename), vertices(nullptr), indices(nullptr)
 {
 }
 
@@ -46,25 +46,20 @@ bool Model::open(StringSet& failedPaths)
     memcpy(&header, f.getBuffer(), sizeof(ModelHeader));
     if (header.nBoundingTriangles > 0)
     {
-        origVertices = (ModelVertex*)(f.getBuffer() + header.ofsVertices);
-        vertices = new Vec3D[header.nVertices];
+        boundingVertices = (ModelBoundingVertex*)(f.getBuffer() + header.ofsBoundingVertices);
+        vertices = new Vec3D[header.nBoundingVertices];
 
-        for (size_t i = 0; i < header.nVertices; i++)
+        for (size_t i = 0; i < header.nBoundingVertices; i++)
         {
-            vertices[i] = fixCoordSystem(origVertices[i].pos);;
+            vertices[i] = fixCoordSystem(boundingVertices[i].pos);
         }
 
-        ModelView* view = (ModelView*)(f.getBuffer() + header.ofsViews);
+        uint16* triangles = (uint16*)(f.getBuffer() + header.ofsBoundingTriangles);
 
-        uint16* indexLookup = (uint16*)(f.getBuffer() + view->ofsIndex);
-        uint16* triangles = (uint16*)(f.getBuffer() + view->ofsTris);
-
-        nIndices = view->nTris;
+        nIndices = header.nBoundingTriangles; // refers to the number of int16's, not the number of triangles
         indices = new uint16[nIndices];
-        for (size_t i = 0; i < nIndices; i++)
-        {
-            indices[i] = indexLookup[triangles[i]];
-        }
+        memcpy(indices, triangles, nIndices * 2);
+
         f.close();
     }
     else
@@ -86,8 +81,8 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
         return false;
     }
     fwrite(szRawVMAPMagic, 8, 1, output);
-    uint32 nVertices = 0;
-    nVertices = header.nVertices;
+
+    uint32 nVertices = header.nBoundingVertices;
     fwrite(&nVertices, sizeof(int), 1, output);
     uint32 nofgroups = 1;
     fwrite(&nofgroups, sizeof(uint32), 1, output);
@@ -100,7 +95,8 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     wsize = sizeof(branches) + sizeof(uint32) * branches;
     fwrite(&wsize, sizeof(int), 1, output);
     fwrite(&branches, sizeof(branches), 1, output);
-    uint32 nIndexes = (uint32) nIndices;
+
+    uint32 nIndexes = header.nBoundingTriangles;
     fwrite(&nIndexes, sizeof(uint32), 1, output);
     fwrite("INDX", 4, 1, output);
     wsize = sizeof(uint32) + sizeof(unsigned short) * nIndexes;
@@ -108,6 +104,16 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     fwrite(&nIndexes, sizeof(uint32), 1, output);
     if (nIndexes > 0)
     {
+        for (uint32 i = 0; i < nIndices; ++i)
+        {
+            // index[0] -> x, index[1] -> y, index[2] -> z, index[3] -> x ...
+            if ((i % 3) - 1 == 0)
+            {
+                uint16 tmp = indices[i];
+                indices[i] = indices[i + 1];
+                indices[i + 1] = tmp;
+            }
+        }
         fwrite(indices, sizeof(unsigned short), nIndexes, output);
     }
     fwrite("VERT", 4, 1, output);
@@ -118,7 +124,9 @@ bool Model::ConvertToVMAPModel(const char* outfilename)
     {
         for (uint32 vpos = 0; vpos < nVertices; ++vpos)
         {
-            std::swap(vertices[vpos].y, vertices[vpos].z);
+            float tmp = vertices[vpos].y;
+            vertices[vpos].y = -vertices[vpos].z;
+            vertices[vpos].z = tmp;
         }
         fwrite(vertices, sizeof(float) * 3, nVertices, output);
     }
@@ -147,15 +155,18 @@ ModelInstance::ModelInstance(MPQFile& f, const char* ModelInstName, uint32 mapID
     pos = fixCoords(Vec3D(ff[0], ff[1], ff[2]));
     f.read(ff, 12);
     rot = Vec3D(ff[0], ff[1], ff[2]);
-    f.read(&scale, 4);
+
+    uint16 dummyFlags;        // dummy var
+    f.read(&scale, 2);
+    f.read(&dummyFlags, 2);   // unknown but flag 1 is used for biodome in Outland, currently this value is not used
+
     // scale factor - divide by 1024. blizzard devs must be on crack, why not just use a float?
     sc = scale / 1024.0f;
 
     char tempname[512];
     sprintf(tempname, "%s/%s", szWorkDirWmo, ModelInstName);
-    FILE* input;
-    input = fopen(tempname, "r+b");
 
+    FILE* input = fopen(tempname, "r+b");
     if (!input)
     {
         //printf("ModelInstance::ModelInstance couldn't open %s\n", tempname);
@@ -164,16 +175,18 @@ ModelInstance::ModelInstance(MPQFile& f, const char* ModelInstName, uint32 mapID
 
     fseek(input, 8, SEEK_SET); // get the correct no of vertices
     int nVertices;
-    fread(&nVertices, sizeof(int), 1, input);
+    int count = fread(&nVertices, sizeof (int), 1, input);
     fclose(input);
 
-    if (nVertices == 0)
+    if (count != 1 || nVertices == 0)
         return;
 
-    uint16 adtId = 0;// not used for models
+    uint16 adtId = 0; // not used for models
     uint32 flags = MOD_M2;
-    if (tileX == 65 && tileY == 65) flags |= MOD_WORLDSPAWN;
-    //write mapID, tileX, tileY, Flags, ID, Pos, Rot, Scale, name
+    if (tileX == 65 && tileY == 65)
+        flags |= MOD_WORLDSPAWN;
+
+    // write mapID, tileX, tileY, Flags, ID, Pos, Rot, Scale, name
     fwrite(&mapID, sizeof(uint32), 1, pDirfile);
     fwrite(&tileX, sizeof(uint32), 1, pDirfile);
     fwrite(&tileY, sizeof(uint32), 1, pDirfile);
@@ -186,20 +199,4 @@ ModelInstance::ModelInstance(MPQFile& f, const char* ModelInstName, uint32 mapID
     uint32 nlen = strlen(ModelInstName);
     fwrite(&nlen, sizeof(uint32), 1, pDirfile);
     fwrite(ModelInstName, sizeof(char), nlen, pDirfile);
-
-    /* int realx1 = (int) ((float) pos.x / 533.333333f);
-    int realy1 = (int) ((float) pos.z / 533.333333f);
-    int realx2 = (int) ((float) pos.x / 533.333333f);
-    int realy2 = (int) ((float) pos.z / 533.333333f);
-
-    fprintf(pDirfile,"%s/%s %f,%f,%f_%f,%f,%f %f %d %d %d,%d %d\n",
-        MapName,
-        ModelInstName,
-        (float) pos.x, (float) pos.y, (float) pos.z,
-        (float) rot.x, (float) rot.y, (float) rot.z,
-        sc,
-        nVertices,
-        realx1, realy1,
-        realx2, realy2
-        ); */
 }

@@ -65,9 +65,9 @@ void OutdoorPvPHP::HandlePlayerEnterZone(Player* player, bool isMainZone)
 
     // buff the player if same team is controlling all capture points
     if (m_towersAlliance == MAX_HP_TOWERS && player->GetTeam() == ALLIANCE)
-        player->CastSpell(player, SPELL_HELLFIRE_SUPERIORITY_ALLIANCE, true);
+        player->CastSpell(player, SPELL_HELLFIRE_SUPERIORITY_ALLIANCE, TRIGGERED_OLD_TRIGGERED);
     else if (m_towersHorde == MAX_HP_TOWERS && player->GetTeam() == HORDE)
-        player->CastSpell(player, SPELL_HELLFIRE_SUPERIORITY_HORDE, true);
+        player->CastSpell(player, SPELL_HELLFIRE_SUPERIORITY_HORDE, TRIGGERED_OLD_TRIGGERED);
 }
 
 void OutdoorPvPHP::HandlePlayerLeaveZone(Player* player, bool isMainZone)
@@ -111,10 +111,9 @@ void OutdoorPvPHP::HandleGameObjectCreate(GameObject* go)
     }
 }
 
-void OutdoorPvPHP::HandleObjectiveComplete(uint32 eventId, std::list<Player*> players, Team team)
+void OutdoorPvPHP::HandleObjectiveComplete(uint32 eventId, const std::list<Player*>& players, Team team)
 {
-    uint32 credit = 0;
-
+    uint32 credit;
     switch (eventId)
     {
         case EVENT_OVERLOOK_PROGRESS_ALLIANCE:
@@ -133,12 +132,12 @@ void OutdoorPvPHP::HandleObjectiveComplete(uint32 eventId, std::list<Player*> pl
             return;
     }
 
-    for (std::list<Player*>::iterator itr = players.begin(); itr != players.end(); ++itr)
+    for (std::list<Player*>::const_iterator itr = players.begin(); itr != players.end(); ++itr)
     {
         if ((*itr) && (*itr)->GetTeam() == team)
         {
             (*itr)->KilledMonsterCredit(credit);
-            (*itr)->RewardHonor(NULL, 1, HONOR_REWARD_HELLFIRE);
+            (*itr)->RewardHonor(nullptr, 1, HONOR_REWARD_HELLFIRE);
         }
     }
 }
@@ -156,7 +155,7 @@ void OutdoorPvPHP::HandlePlayerKillInsideArea(Player* player)
             {
                 // check capture point team
                 if (player->GetTeam() == m_towerOwner[i])
-                    player->CastSpell(player, player->GetTeam() == ALLIANCE ? SPELL_HELLFIRE_TOWER_TOKEN_ALLIANCE : SPELL_HELLFIRE_TOWER_TOKEN_HORDE, true);
+                    player->CastSpell(player, player->GetTeam() == ALLIANCE ? SPELL_HELLFIRE_TOWER_TOKEN_ALLIANCE : SPELL_HELLFIRE_TOWER_TOKEN_HORDE, TRIGGERED_OLD_TRIGGERED);
 
                 return;
             }

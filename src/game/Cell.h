@@ -19,15 +19,13 @@
 #ifndef MANGOS_CELL_H
 #define MANGOS_CELL_H
 
-#include "GameSystem/TypeContainer.h"
 #include "GameSystem/TypeContainerVisitor.h"
 #include "GridDefines.h"
-#include <cmath>
 
 class Map;
 class WorldObject;
 
-struct MANGOS_DLL_DECL CellArea
+struct CellArea
 {
     CellArea() {}
     CellArea(CellPair low, CellPair high) : low_bound(low), high_bound(high) {}
@@ -44,7 +42,7 @@ struct MANGOS_DLL_DECL CellArea
     CellPair high_bound;
 };
 
-struct MANGOS_DLL_DECL Cell
+struct Cell
 {
         Cell() { data.All = 0; }
         Cell(const Cell& cell) { data.All = cell.data.All; }
@@ -106,8 +104,8 @@ struct MANGOS_DLL_DECL Cell
             uint32 All;
         } data;
 
-        template<class T, class CONTAINER> void Visit(const CellPair& cellPair, TypeContainerVisitor<T, CONTAINER> &visitor, Map& m, float x, float y, float radius) const;
-        template<class T, class CONTAINER> void Visit(const CellPair& cellPair, TypeContainerVisitor<T, CONTAINER> &visitor, Map& m, const WorldObject& obj, float radius) const;
+        template<class T, class CONTAINER> void Visit(const CellPair& cellPair, TypeContainerVisitor<T, CONTAINER>& visitor, Map& m, float x, float y, float radius) const;
+        template<class T, class CONTAINER> void Visit(const CellPair& cellPair, TypeContainerVisitor<T, CONTAINER>& visitor, Map& m, const WorldObject& obj, float radius) const;
 
         static CellArea CalculateCellArea(float x, float y, float radius);
 
@@ -120,7 +118,7 @@ struct MANGOS_DLL_DECL Cell
         template<class T> static void VisitAllObjects(float x, float y, Map* map, T& visitor, float radius, bool dont_load = true);
 
     private:
-        template<class T, class CONTAINER> void VisitCircle(TypeContainerVisitor<T, CONTAINER> &, Map&, const CellPair& , const CellPair&) const;
+        template<class T, class CONTAINER> void VisitCircle(TypeContainerVisitor<T, CONTAINER>&, Map&, const CellPair&, const CellPair&) const;
 };
 
 #endif

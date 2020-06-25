@@ -36,9 +36,6 @@
 
 #include "Common.h"
 #include "Mail.h"
-#include "Policies/Singleton.h"
-
-#include <memory>
 
 /**
  * A class to represent the mail send factory to multiple (often all existing) characters.
@@ -54,7 +51,7 @@ class MassMailMgr
         void GetStatistic(uint32& tasks, uint32& mails, uint32& needTime) const;
 
     public:                                                 // modifiers
-        typedef UNORDERED_SET<uint32> ReceiversList;
+        typedef std::unordered_set<uint32> ReceiversList;
 
         /**
          * And new mass mail task for raceMask filter applied to characters list.
@@ -64,7 +61,7 @@ class MassMailMgr
          *
          * Note: this function safe to be called from Map::Update content/etc, real data add will executed in next tick after query results ready
          */
-        void AddMassMailTask(MailDraft* mailProto, MailSender sender, uint32 raceMask);
+        void AddMassMailTask(MailDraft* mailProto, const MailSender& sender, uint32 raceMask);
 
         /**
          * And new mass mail task with SQL query text for fill receivers list.
@@ -74,7 +71,7 @@ class MassMailMgr
          *
          * Note: this function safe to be called from Map::Update content/etc, real data add will executed in next tick after query results ready
          */
-        void AddMassMailTask(MailDraft* mailProto, MailSender sender, char const* queryStr);
+        void AddMassMailTask(MailDraft* mailProto, const MailSender& sender, char const* queryStr);
 
         /**
          * And new mass mail task and let fill receivers list returned as result.
@@ -84,7 +81,7 @@ class MassMailMgr
          *
          * Note: this function NOT SAFE for call from Map::Update content/etc
          */
-        ReceiversList& AddMassMailTask(MailDraft* mailProto, MailSender sender)
+        ReceiversList& AddMassMailTask(MailDraft* mailProto, const MailSender& sender)
         {
             m_massMails.push_back(MassMail(mailProto, sender));
             return m_massMails.rbegin()->m_receivers;
@@ -111,7 +108,7 @@ class MassMailMgr
             {
             }
 
-            /// m_protoMail is owned by MassMail, so at copy original MassMail field set to NULL
+            /// m_protoMail is owned by MassMail, so at copy original MassMail field set to nullptr
             std::auto_ptr<MailDraft> m_protoMail;
 
             MailSender m_sender;

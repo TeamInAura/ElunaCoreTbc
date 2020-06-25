@@ -62,8 +62,8 @@ void OutdoorPvPMgr::InitOutdoorPvP()
     LOAD_OPVP_ZONE(TF);
     LOAD_OPVP_ZONE(NA);
 
-    sLog.outString();
     sLog.outString(">> Loaded %u Outdoor PvP zones", counter);
+    sLog.outString();
 }
 
 OutdoorPvP* OutdoorPvPMgr::GetScript(uint32 zoneId)
@@ -83,7 +83,7 @@ OutdoorPvP* OutdoorPvPMgr::GetScript(uint32 zoneId)
         case ZONE_ID_NAGRAND:
             return m_scripts[OPVP_ID_NA];
         default:
-            return NULL;
+            return nullptr;
     }
 }
 
@@ -115,7 +115,7 @@ OutdoorPvP* OutdoorPvPMgr::GetScriptOfAffectedZone(uint32 zoneId)
         case ZONE_ID_MANA_TOMBS:
             return m_scripts[OPVP_ID_TF];
         default:
-            return NULL;
+            return nullptr;
     }
 }
 
@@ -129,8 +129,8 @@ void OutdoorPvPMgr::HandlePlayerEnterZone(Player* player, uint32 zoneId)
 {
     if (OutdoorPvP* script = GetScript(zoneId))
         script->HandlePlayerEnterZone(player, true);
-    else if (OutdoorPvP* script = GetScriptOfAffectedZone(zoneId))
-        script->HandlePlayerEnterZone(player, false);
+    else if (OutdoorPvP* affectedScript = GetScriptOfAffectedZone(zoneId))
+        affectedScript->HandlePlayerEnterZone(player, false);
 }
 
 /**
@@ -144,8 +144,8 @@ void OutdoorPvPMgr::HandlePlayerLeaveZone(Player* player, uint32 zoneId)
     // teleport: called once from Player::CleanupsBeforeDelete, once from Player::UpdateZone
     if (OutdoorPvP* script = GetScript(zoneId))
         script->HandlePlayerLeaveZone(player, true);
-    else if (OutdoorPvP* script = GetScriptOfAffectedZone(zoneId))
-        script->HandlePlayerLeaveZone(player, false);
+    else if (OutdoorPvP* affectedScript = GetScriptOfAffectedZone(zoneId))
+        affectedScript->HandlePlayerLeaveZone(player, false);
 }
 
 void OutdoorPvPMgr::Update(uint32 diff)

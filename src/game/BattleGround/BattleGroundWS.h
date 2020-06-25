@@ -77,6 +77,10 @@ class BattleGroundWGScore : public BattleGroundScore
     public:
         BattleGroundWGScore() : FlagCaptures(0), FlagReturns(0) {};
         virtual ~BattleGroundWGScore() {};
+
+        uint32 GetAttr1() const { return FlagCaptures; }
+        uint32 GetAttr2() const { return FlagReturns; }
+
         uint32 FlagCaptures;
         uint32 FlagReturns;
 };
@@ -126,7 +130,7 @@ class BattleGroundWS : public BattleGround
         virtual void EventPlayerCapturedFlag(Player* source) override;
 
         void RemovePlayer(Player* plr, ObjectGuid guid) override;
-        void HandleAreaTrigger(Player* source, uint32 trigger) override;
+        bool HandleAreaTrigger(Player* source, uint32 trigger) override;
         void HandleKillPlayer(Player* player, Player* killer) override;
         virtual void Reset() override;
         void EndBattleGround(Team winner) override;
@@ -139,15 +143,16 @@ class BattleGroundWS : public BattleGround
         void ClearDroppedFlagGuid(Team team)  { m_DroppedFlagGuid[GetTeamIndexByTeamId(team)].Clear();}
         ObjectGuid const& GetDroppedFlagGuid(Team team) const { return m_DroppedFlagGuid[GetTeamIndexByTeamId(team)];}
         virtual void FillInitialWorldStates(WorldPacket& data, uint32& count) override;
+        virtual Team GetPrematureWinner() override;
 
     private:
         ObjectGuid m_flagCarrierAlliance;
         ObjectGuid m_flagCarrierHorde;
 
-        ObjectGuid m_DroppedFlagGuid[BG_TEAMS_COUNT];
-        uint8 m_FlagState[BG_TEAMS_COUNT];
-        int32 m_FlagsTimer[BG_TEAMS_COUNT];
-        int32 m_FlagsDropTimer[BG_TEAMS_COUNT];
+        ObjectGuid m_DroppedFlagGuid[PVP_TEAM_COUNT];
+        uint8 m_FlagState[PVP_TEAM_COUNT];
+        int32 m_FlagsTimer[PVP_TEAM_COUNT];
+        int32 m_FlagsDropTimer[PVP_TEAM_COUNT];
 
         uint32 m_ReputationCapture;
         uint32 m_HonorWinKills;

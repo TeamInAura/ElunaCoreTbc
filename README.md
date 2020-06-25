@@ -1,4 +1,5 @@
-# C(ontinued)-MaNGOS -- README  ![Build status](https://api.travis-ci.org/eluna-dev-mangos/ElunaCoreTbc.png)
+# C(ontinued)-MaNGOS -- README
+[![Build Status](https://travis-ci.org/cmangos/mangos-tbc.svg?branch=master)](https://travis-ci.org/cmangos/mangos-tbc) [![Windows Build status](https://ci.appveyor.com/api/projects/status/github/cmangos/mangos-tbc?branch=master&svg=true)](https://ci.appveyor.com/project/cmangos/mangos-tbc/branch/master)
 
 This file is part of the CMaNGOS Project. See [AUTHORS](AUTHORS.md) file for Copyright information
 
@@ -47,6 +48,29 @@ To be able to accomplish these goals, we support and promote:
 
 -- The C(ontinued)-MaNGOS Team!
 
+## ScriptDev2
+  ScriptDev2 is a script library, an extention of the scripting capabilities
+  that comes with cMaNGOS ( http://cmangos.net/ ), written in C++ and is
+  compatible with Windows and Linux. SQL needed for database support both
+  MySQL and PostgreSQL.
+
+  This script library provides unique scripts for NPCs, gameobjects, events
+  and other that need unique implementation.
+
+  Once ScriptDev2 is compiled it is automatically run by MaNGOS on server
+  startup.
+
+  For further information on ScriptDev2, please visit our project subforum
+  at http://cmangos.net/forum-32.html
+
+  Documentation on various development related topics can be found in the
+  ../doc/scripts docs/ sub directory as well as on the subforum.
+
+  The required SQL files for creating the database backend are included in
+  the ../sql/ sub directory. If you are updating from an older ScriptDev2
+  version, make sure to take a look at the SQL files provided in the
+  ../sql/updates/ 
+
 ## Further information
 
   You can find further information about CMaNGOS at the following places:
@@ -59,12 +83,6 @@ To be able to accomplish these goals, we support and promote:
   * [Wiki](https://github.com/cmangos/issues/wiki) with additional information on installation
   * [Contributing Guidelines](CONTRIBUTING.md)
   * Documentation can be found in the doc/ subdirectory and on the github wiki
-
-# ![logo](https://dl.dropbox.com/u/98478761/eluna-DBCA-Designs.png)
-
-  You can find further information about Eluna at the following places:
-  * [Eluna Wiki](http://wiki.emudevs.com/doku.php?id=eluna)
-  * [Eluna Support Forum](http://emudevs.com)
 
 ## License
 
@@ -99,7 +117,3 @@ To be able to accomplish these goals, we support and promote:
   modify this file, you may extend this exception to your version of the
   file, but you are not obligated to do so.  If you do not wish to do
   so, delete this exception statement from your version.
-
-
-[![Bitdeli Badge](https://d2weczhvl823v0.cloudfront.net/eluna-dev-mangos/elunacoretbc/trend.png)](https://bitdeli.com/free "Bitdeli Badge")
-

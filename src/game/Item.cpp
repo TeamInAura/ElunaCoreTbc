@@ -23,7 +23,8 @@
 #include "Database/DatabaseEnv.h"
 #include "ItemEnchantmentMgr.h"
 #include "SQLStorages.h"
-#include "HookMgr.h"
+#include "LootMgr.h"
+#include "LuaEngine.h"
 
 void AddItemsSetItem(Player* player, Item* item)
 {
@@ -41,7 +42,7 @@ void AddItemsSetItem(Player* player, Item* item)
     if (set->required_skill_id && player->GetSkillValue(set->required_skill_id) < set->required_skill_value)
         return;
 
-    ItemSetEffect* eff = NULL;
+    ItemSetEffect* eff = nullptr;
 
     for (size_t x = 0; x < player->ItemSetEff.size(); ++x)
     {
@@ -92,7 +93,7 @@ void AddItemsSetItem(Player* player, Item* item)
         {
             if (!eff->spells[y])                            // free slot
             {
-                SpellEntry const* spellInfo = sSpellStore.LookupEntry(set->spells[x]);
+                SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(set->spells[x]);
                 if (!spellInfo)
                 {
                     sLog.outError("WORLD: unknown spell id %u in items set %u effects", set->spells[x], setid);
@@ -100,7 +101,7 @@ void AddItemsSetItem(Player* player, Item* item)
                 }
 
                 // spell casted only if fit form requirement, in other case will casted at form change
-                player->ApplyEquipSpell(spellInfo, NULL, true);
+                player->ApplyEquipSpell(spellInfo, nullptr, true);
                 eff->spells[y] = spellInfo;
                 break;
             }
@@ -120,7 +121,7 @@ void RemoveItemsSetItem(Player* player, ItemPrototype const* proto)
         return;
     }
 
-    ItemSetEffect* eff = NULL;
+    ItemSetEffect* eff = nullptr;
     size_t setindex = 0;
     for (; setindex < player->ItemSetEff.size(); ++setindex)
     {
@@ -151,8 +152,8 @@ void RemoveItemsSetItem(Player* player, ItemPrototype const* proto)
             if (eff->spells[z] && eff->spells[z]->Id == set->spells[x])
             {
                 // spell can be not active if not fit form requirement
-                player->ApplyEquipSpell(eff->spells[z], NULL, false);
-                eff->spells[z] = NULL;
+                player->ApplyEquipSpell(eff->spells[z], nullptr, false);
+                eff->spells[z] = nullptr;
                 break;
             }
         }
@@ -162,7 +163,7 @@ void RemoveItemsSetItem(Player* player, ItemPrototype const* proto)
     {
         MANGOS_ASSERT(eff == player->ItemSetEff[setindex]);
         delete eff;
-        player->ItemSetEff[setindex] = NULL;
+        player->ItemSetEff[setindex] = nullptr;
     }
 }
 
@@ -227,8 +228,7 @@ bool ItemCanGoIntoBag(ItemPrototype const* pProto, ItemPrototype const* pBagProt
     return false;
 }
 
-Item::Item() :
-    loot(NULL)
+Item::Item()
 {
     m_objectType |= TYPEMASK_ITEM;
     m_objectTypeId = TYPEID_ITEM;
@@ -239,7 +239,7 @@ Item::Item() :
     m_slot = 0;
     uState = ITEM_NEW;
     uQueuePos = -1;
-    m_container = NULL;
+    m_container = nullptr;
     mb_in_trade = false;
     m_lootState = ITEM_LOOT_NONE;
 }
@@ -287,7 +287,7 @@ void Item::UpdateDuration(Player* owner, uint32 diff)
     if (GetUInt32Value(ITEM_FIELD_DURATION) <= diff)
     {
         // used by eluna
-        sHookMgr.OnExpire(owner, GetProto());
+        sEluna->OnExpire(owner, GetProto());
         owner->DestroyItem(GetBagSlot(), GetSlot(), true);
         return;
     }
@@ -378,7 +378,7 @@ void Item::SaveToDB()
         stmt.PExecute(GetGUIDLow());
     }
 
-    if (m_lootState == ITEM_LOOT_NEW || m_lootState == ITEM_LOOT_CHANGED)
+    if (loot && (m_lootState == ITEM_LOOT_NEW || m_lootState == ITEM_LOOT_CHANGED))
     {
         if (Player* owner = GetOwner())
         {
@@ -386,33 +386,26 @@ void Item::SaveToDB()
             static SqlStatementID saveLoot ;
 
             // save money as 0 itemid data
-            if (loot.gold)
+            if (loot->GetGoldAmount())
             {
                 SqlStatement stmt = CharacterDatabase.CreateStatement(saveGold, "INSERT INTO item_loot (guid,owner_guid,itemid,amount,suffix,property) VALUES (?, ?, 0, ?, 0, 0)");
-                stmt.PExecute(GetGUIDLow(), owner->GetGUIDLow(), loot.gold);
+                stmt.PExecute(GetGUIDLow(), owner->GetGUIDLow(), loot->GetGoldAmount());
             }
 
             SqlStatement stmt = CharacterDatabase.CreateStatement(saveLoot, "INSERT INTO item_loot (guid,owner_guid,itemid,amount,suffix,property) VALUES (?, ?, ?, ?, ?, ?)");
 
             // save items and quest items (at load its all will added as normal, but this not important for item loot case)
-            for (size_t i = 0; i < loot.GetMaxSlotInLootFor(owner); ++i)
+            LootItemList lootList;
+            loot->GetLootItemsListFor(owner, lootList);
+            for (LootItemList::const_iterator lootItr = lootList.begin(); lootItr != lootList.end(); ++lootItr)
             {
-                QuestItem* qitem = NULL;
-
-                LootItem* item = loot.LootItemInSlot(i, owner, &qitem);
-                if (!item)
-                    continue;
-
-                // questitems use the blocked field for other purposes
-                if (!qitem && item->is_blocked)
-                    continue;
-
+                LootItem* lootItem = *lootItr;
                 stmt.addUInt32(GetGUIDLow());
                 stmt.addUInt32(owner->GetGUIDLow());
-                stmt.addUInt32(item->itemid);
-                stmt.addUInt8(item->count);
-                stmt.addUInt32(item->randomSuffix);
-                stmt.addInt32(item->randomPropertyId);
+                stmt.addUInt32(lootItem->itemId);
+                stmt.addUInt8(lootItem->count);
+                stmt.addUInt32(lootItem->randomSuffix);
+                stmt.addInt32(lootItem->randomPropertyId);
 
                 stmt.Execute();
             }
@@ -493,7 +486,7 @@ bool Item::LoadFromDB(uint32 guidLow, Field* fields, ObjectGuid ownerGuid)
     if (HasFlag(ITEM_FIELD_FLAGS, ITEM_DYNFLAG_WRAPPED))
     {
         // wrapped item must be wrapper (used version that not stackable)
-        if (!(proto->Flags & ITEM_FLAG_WRAPPER) || GetMaxStackCount() > 1)
+        if (!(proto->Flags & ITEM_FLAG_IS_WRAPPER) || GetMaxStackCount() > 1)
         {
             RemoveFlag(ITEM_FIELD_FLAGS, ITEM_DYNFLAG_WRAPPED);
             need_save = true;
@@ -535,7 +528,7 @@ void Item::LoadLootFromDB(Field* fields)
     // money value special case
     if (item_id == 0)
     {
-        loot.gold = item_amount;
+        loot->SetGoldAmount(item_amount);
         SetLootState(ITEM_LOOT_UNCHANGED);
         return;
     }
@@ -550,8 +543,7 @@ void Item::LoadLootFromDB(Field* fields)
         return;
     }
 
-    loot.items.push_back(LootItem(item_id, item_amount, item_suffix, item_propid));
-    ++loot.unlootedCount;
+    loot->AddItem(item_id, item_amount, item_suffix, item_propid);
 
     SetLootState(ITEM_LOOT_UNCHANGED);
 }
@@ -564,7 +556,7 @@ void Item::DeleteFromDB()
     stmt.PExecute(GetGUIDLow());
 }
 
-void Item::DeleteFromInventoryDB()
+void Item::DeleteFromInventoryDB() const
 {
     static SqlStatementID delInv ;
 
@@ -582,7 +574,7 @@ Player* Item::GetOwner()const
     return sObjectMgr.GetPlayer(GetOwnerGuid());
 }
 
-uint32 Item::GetSkill()
+uint32 Item::GetSkill() const
 {
     const static uint32 item_weapon_skills[MAX_ITEM_SUBCLASS_WEAPON] =
     {
@@ -619,7 +611,7 @@ uint32 Item::GetSkill()
     }
 }
 
-uint32 Item::GetSpell()
+uint32 Item::GetSpell() const
 {
     ItemPrototype const* proto = GetProto();
 
@@ -641,7 +633,7 @@ uint32 Item::GetSpell()
                 case ITEM_SUBCLASS_WEAPON_DAGGER:  return 1180;
                 case ITEM_SUBCLASS_WEAPON_THROWN:  return 2567;
                 case ITEM_SUBCLASS_WEAPON_SPEAR:   return 3386;
-                case ITEM_SUBCLASS_WEAPON_CROSSBOW:return 5011;
+                case ITEM_SUBCLASS_WEAPON_CROSSBOW: return 5011;
                 case ITEM_SUBCLASS_WEAPON_WAND:    return 5009;
                 default: return 0;
             }
@@ -829,7 +821,7 @@ void Item::RemoveFromUpdateQueueOf(Player* player)
     if (player->m_itemUpdateQueueBlocked)
         return;
 
-    player->m_itemUpdateQueue[uQueuePos] = NULL;
+    player->m_itemUpdateQueue[uQueuePos] = nullptr;
     uQueuePos = -1;
 }
 
@@ -914,7 +906,7 @@ bool Item::IsFitToSpellRequirements(SpellEntry const* spellInfo) const
     return true;
 }
 
-bool Item::IsTargetValidForItemUse(Unit* pUnitTarget)
+bool Item::IsTargetValidForItemUse(Unit* pUnitTarget) const
 {
     ItemRequiredTargetMapBounds bounds = sObjectMgr.GetItemRequiredTargetMapBounds(GetProto()->ItemId);
 
@@ -976,7 +968,7 @@ bool Item::GemsFitSockets() const
     bool fits = true;
     for (uint32 enchant_slot = SOCK_ENCHANTMENT_SLOT; enchant_slot < SOCK_ENCHANTMENT_SLOT + MAX_GEM_SOCKETS; ++enchant_slot)
     {
-        uint8 SocketColor = GetProto()->Socket[enchant_slot-SOCK_ENCHANTMENT_SLOT].Color;
+        uint8 SocketColor = GetProto()->Socket[enchant_slot - SOCK_ENCHANTMENT_SLOT].Color;
 
         uint32 enchant_id = GetEnchantmentId(EnchantmentSlot(enchant_slot));
         if (!enchant_id)
@@ -1039,7 +1031,7 @@ bool Item::IsLimitedToAnotherMapOrZone(uint32 cur_mapId, uint32 cur_zoneId) cons
 // Though the client has the information in the item's data field,
 // we have to send SMSG_ITEM_TIME_UPDATE to display the remaining
 // time.
-void Item::SendTimeUpdate(Player* owner)
+void Item::SendTimeUpdate(Player* owner) const
 {
     uint32 duration = GetUInt32Value(ITEM_FIELD_DURATION);
     if (!duration)
@@ -1048,13 +1040,13 @@ void Item::SendTimeUpdate(Player* owner)
     WorldPacket data(SMSG_ITEM_TIME_UPDATE, (8 + 4));
     data << ObjectGuid(GetObjectGuid());
     data << uint32(duration);
-    owner->GetSession()->SendPacket(&data);
+    owner->GetSession()->SendPacket(data);
 }
 
 Item* Item::CreateItem(uint32 item, uint32 count, Player const* player, uint32 randomPropertyId)
 {
     if (count < 1)
-        return NULL;                                        // don't create item at zero count
+        return nullptr;                                        // don't create item at zero count
 
     if (ItemPrototype const* pProto = ObjectMgr::GetItemPrototype(item))
     {
@@ -1075,14 +1067,14 @@ Item* Item::CreateItem(uint32 item, uint32 count, Player const* player, uint32 r
         else
             delete pItem;
     }
-    return NULL;
+    return nullptr;
 }
 
 Item* Item::CloneItem(uint32 count, Player const* player) const
 {
     Item* newItem = CreateItem(GetEntry(), count, player, GetItemRandomPropertyId());
     if (!newItem)
-        return NULL;
+        return nullptr;
 
     newItem->SetGuidValue(ITEM_FIELD_CREATOR,     GetGuidValue(ITEM_FIELD_CREATOR));
     newItem->SetGuidValue(ITEM_FIELD_GIFTCREATOR, GetGuidValue(ITEM_FIELD_GIFTCREATOR));

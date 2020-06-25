@@ -21,7 +21,6 @@
 #include "Player.h"
 #include "GridNotifiers.h"
 #include "Log.h"
-#include "GridStates.h"
 #include "CellImpl.h"
 #include "InstanceData.h"
 #include "GridNotifiersImpl.h"
@@ -35,21 +34,28 @@
 #include "MapPersistentStateMgr.h"
 #include "VMapFactory.h"
 #include "MoveMap.h"
-#include "BattleGround/BattleGroundMgr.h"
 #include "Chat.h"
+#include "Weather.h"
+#include "LuaEngine.h"
+#include "ObjectGridLoader.h"
 
 Map::~Map()
 {
+    sEluna->OnDestroy(this);
+
     UnloadAll(true);
 
     if (!m_scriptSchedule.empty())
         sScriptMgr.DecreaseScheduledScriptCount(m_scriptSchedule.size());
 
     if (m_persistentState)
-        m_persistentState->SetUsedByMapState(NULL);         // field pointer can be deleted after this
+        m_persistentState->SetUsedByMapState(nullptr);         // field pointer can be deleted after this
+
+    if (Instanceable())
+        sEluna->FreeInstanceId(GetInstanceId());
 
     delete i_data;
-    i_data = NULL;
+    i_data = nullptr;
 
     // unload instance specific navigation data
     MMAP::MMapFactory::createOrGetMMapManager()->unloadMapInstance(m_TerrainData->GetMapId(), GetInstanceId());
@@ -57,6 +63,9 @@ Map::~Map()
     // release reference count
     if (m_TerrainData->Release())
         sTerrainMgr.UnloadTerrain(m_TerrainData->GetMapId());
+
+    delete m_weatherSystem;
+    m_weatherSystem = nullptr;
 }
 
 void Map::LoadMapAndVMap(int gx, int gy)
@@ -71,10 +80,10 @@ void Map::LoadMapAndVMap(int gx, int gy)
 Map::Map(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode)
     : i_mapEntry(sMapStore.LookupEntry(id)), i_spawnMode(SpawnMode),
       i_id(id), i_InstanceId(InstanceId), m_unloadTimer(0),
-      m_VisibleDistance(DEFAULT_VISIBILITY_DISTANCE), m_persistentState(NULL),
+      m_VisibleDistance(DEFAULT_VISIBILITY_DISTANCE), m_persistentState(nullptr),
       m_activeNonPlayersIter(m_activeNonPlayers.end()),
       i_gridExpiry(expiry), m_TerrainData(sTerrainMgr.LoadTerrain(id)),
-      i_data(NULL), i_script_id(0)
+      i_data(nullptr), i_script_id(0)
 {
     m_CreatureGuids.Set(sObjectMgr.GetFirstTemporaryCreatureLowGuid());
     m_GameObjectGuids.Set(sObjectMgr.GetFirstTemporaryGameObjectLowGuid());
@@ -85,7 +94,7 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode)
         {
             // z code
             m_bLoadedGrids[idx][j] = false;
-            setNGrid(NULL, idx, j);
+            setNGrid(nullptr, idx, j);
         }
     }
 
@@ -97,6 +106,10 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId, uint8 SpawnMode)
 
     m_persistentState = sMapPersistentStateMgr.AddPersistentState(i_mapEntry, GetInstanceId(), GetDifficulty(), 0, IsDungeon());
     m_persistentState->SetUsedByMapState(this);
+
+    m_weatherSystem = new WeatherSystem(this);
+
+    sEluna->OnCreate(this);
 }
 
 void Map::InitVisibilityDistance()
@@ -253,7 +266,7 @@ bool Map::EnsureGridLoaded(const Cell& cell)
     EnsureGridCreated(GridPair(cell.GridX(), cell.GridY()));
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
 
-    MANGOS_ASSERT(grid != NULL);
+    MANGOS_ASSERT(grid != nullptr);
     if (!isGridObjectDataLoaded(cell.GridX(), cell.GridY()))
     {
         // it's important to set it loaded before loading!
@@ -273,12 +286,15 @@ bool Map::EnsureGridLoaded(const Cell& cell)
     return false;
 }
 
-void Map::LoadGrid(const Cell& cell, bool no_unload)
+void Map::ForceLoadGrid(float x, float y)
 {
-    EnsureGridLoaded(cell);
-
-    if (no_unload)
+    if (!IsLoaded(x, y))
+    {
+        CellPair p = MaNGOS::ComputeCellPair(x, y);
+        Cell cell(p);
+        EnsureGridLoadedAtEnter(cell);
         getNGrid(cell.GridX(), cell.GridY())->setUnloadExplicitLock(true);
+    }
 }
 
 bool Map::Add(Player* player)
@@ -298,6 +314,9 @@ bool Map::Add(Player* player)
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
     player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
     UpdateObjectVisibility(player, cell, p);
+
+    sEluna->OnMapChanged(player);
+    sEluna->OnPlayerEnter(this, player);
 
     if (i_data)
         i_data->OnPlayerEnter(player);
@@ -327,7 +346,7 @@ Map::Add(T* obj)
         EnsureGridCreated(GridPair(cell.GridX(), cell.GridY()));
 
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
-    MANGOS_ASSERT(grid != NULL);
+    MANGOS_ASSERT(grid != nullptr);
 
     AddToGrid(obj, grid, cell);
     obj->AddToWorld();
@@ -338,10 +357,12 @@ Map::Add(T* obj)
     DEBUG_LOG("%s enters grid[%u,%u]", obj->GetGuidStr().c_str(), cell.GridX(), cell.GridY());
 
     obj->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()));
+    obj->SetItsNewObject(true);
     UpdateObjectVisibility(obj, cell, p);
+    obj->SetItsNewObject(false);
 }
 
-void Map::MessageBroadcast(Player const* player, WorldPacket* msg, bool to_self)
+void Map::MessageBroadcast(Player const* player, WorldPacket const& msg, bool to_self)
 {
     CellPair p = MaNGOS::ComputeCellPair(player->GetPositionX(), player->GetPositionY());
 
@@ -362,7 +383,7 @@ void Map::MessageBroadcast(Player const* player, WorldPacket* msg, bool to_self)
     cell.Visit(p, message, *this, *player, GetVisibilityDistance());
 }
 
-void Map::MessageBroadcast(WorldObject const* obj, WorldPacket* msg)
+void Map::MessageBroadcast(WorldObject const* obj, WorldPacket const& msg)
 {
     CellPair p = MaNGOS::ComputeCellPair(obj->GetPositionX(), obj->GetPositionY());
 
@@ -385,7 +406,7 @@ void Map::MessageBroadcast(WorldObject const* obj, WorldPacket* msg)
     cell.Visit(p, message, *this, *obj, GetVisibilityDistance());
 }
 
-void Map::MessageDistBroadcast(Player const* player, WorldPacket* msg, float dist, bool to_self, bool own_team_only)
+void Map::MessageDistBroadcast(Player const* player, WorldPacket const& msg, float dist, bool to_self, bool own_team_only)
 {
     CellPair p = MaNGOS::ComputeCellPair(player->GetPositionX(), player->GetPositionY());
 
@@ -406,7 +427,7 @@ void Map::MessageDistBroadcast(Player const* player, WorldPacket* msg, float dis
     cell.Visit(p, message, *this, *player, dist);
 }
 
-void Map::MessageDistBroadcast(WorldObject const* obj, WorldPacket* msg, float dist)
+void Map::MessageDistBroadcast(WorldObject const* obj, WorldPacket const& msg, float dist)
 {
     CellPair p = MaNGOS::ComputeCellPair(obj->GetPositionX(), obj->GetPositionY());
 
@@ -561,12 +582,18 @@ void Map::Update(const uint32& t_diff)
     if (!m_scriptSchedule.empty())
         ScriptsProcess();
 
+    sEluna->OnUpdate(this, t_diff);
+
     if (i_data)
         i_data->Update(t_diff);
+
+    m_weatherSystem->UpdateWeathers(t_diff);
 }
 
 void Map::Remove(Player* player, bool remove)
 {
+    sEluna->OnPlayerLeave(this, player);
+
     if (i_data)
         i_data->OnPlayerLeave(player);
 
@@ -579,7 +606,7 @@ void Map::Remove(Player* player, bool remove)
     // after decrement+unlink, ++m_mapRefIter will continue correctly
     // when the first element of the list is being removed
     // nocheck_prev will return the padding element of the RefManager
-    // instead of NULL in the case of prev
+    // instead of nullptr in the case of prev
     if (m_mapRefIter == player->GetMapRef())
         m_mapRefIter = m_mapRefIter->nocheck_prev();
     player->GetMapRef().unlink();
@@ -599,13 +626,13 @@ void Map::Remove(Player* player, bool remove)
 
     if (!getNGrid(cell.data.Part.grid_x, cell.data.Part.grid_y))
     {
-        sLog.outError("Map::Remove() i_grids was NULL x:%d, y:%d", cell.data.Part.grid_x, cell.data.Part.grid_y);
+        sLog.outError("Map::Remove() i_grids was nullptr x:%d, y:%d", cell.data.Part.grid_x, cell.data.Part.grid_y);
         return;
     }
 
     DEBUG_FILTER_LOG(LOG_FILTER_PLAYER_MOVES, "Remove player %s from grid[%u,%u]", player->GetName(), cell.GridX(), cell.GridY());
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
-    MANGOS_ASSERT(grid != NULL);
+    MANGOS_ASSERT(grid != nullptr);
 
     RemoveFromGrid(player, grid, cell);
 
@@ -634,7 +661,7 @@ Map::Remove(T* obj, bool remove)
 
     DEBUG_LOG("Remove object (GUID: %u TypeId:%u) from grid[%u,%u]", obj->GetGUIDLow(), obj->GetTypeId(), cell.data.Part.grid_x, cell.data.Part.grid_y);
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
-    MANGOS_ASSERT(grid != NULL);
+    MANGOS_ASSERT(grid != nullptr);
 
     if (obj->isActiveObject())
         RemoveFromActive(obj);
@@ -702,7 +729,6 @@ void Map::CreatureRelocation(Creature* creature, float x, float y, float z, floa
 {
     MANGOS_ASSERT(CheckGridIntegrity(creature, false));
 
-    Cell old_cell = creature->GetCurrentCell();
     Cell new_cell(MaNGOS::ComputeCellPair(x, y));
 
     // do move or do move to respawn or remove creature if previous all fail
@@ -723,7 +749,7 @@ void Map::CreatureRelocation(Creature* creature, float x, float y, float z, floa
     MANGOS_ASSERT(CheckGridIntegrity(creature, true));
 }
 
-bool Map::CreatureCellRelocation(Creature* c, Cell new_cell)
+bool Map::CreatureCellRelocation(Creature* c, const Cell& new_cell)
 {
     Cell const& old_cell = c->GetCurrentCell();
     if (old_cell.DiffGrid(new_cell))
@@ -776,7 +802,7 @@ bool Map::CreatureRespawnRelocation(Creature* c)
 bool Map::UnloadGrid(const uint32& x, const uint32& y, bool pForce)
 {
     NGridType* grid = getNGrid(x, y);
-    MANGOS_ASSERT(grid != NULL);
+    MANGOS_ASSERT(grid != nullptr);
 
     {
         if (!pForce && ActiveObjectsNearGrid(x, y))
@@ -797,14 +823,14 @@ bool Map::UnloadGrid(const uint32& x, const uint32& y, bool pForce)
 
         unloader.UnloadN();
         delete getNGrid(x, y);
-        setNGrid(NULL, x, y);
+        setNGrid(nullptr, x, y);
     }
 
     int gx = (MAX_NUMBER_OF_GRIDS - 1) - x;
     int gy = (MAX_NUMBER_OF_GRIDS - 1) - y;
 
     // unload GridMap - it is reference-countable so will be deleted safely when lockCount < 1
-    // also simply set Map's pointer to corresponding GridMap object to NULL
+    // also simply set Map's pointer to corresponding GridMap object to nullptr
     if (m_bLoadedGrids[gx][gy])
     {
         m_bLoadedGrids[gx][gy] = false;
@@ -870,7 +896,7 @@ void Map::UpdateObjectVisibility(WorldObject* obj, Cell cell, CellPair cellpair)
     cell.Visit(cellpair, player_notifier, *this, *obj, GetVisibilityDistance());
 }
 
-void Map::SendInitSelf(Player* player)
+void Map::SendInitSelf(Player* player) const
 {
     DETAIL_LOG("Creating player data for himself %u", player->GetGUIDLow());
 
@@ -902,11 +928,11 @@ void Map::SendInitSelf(Player* player)
     }
 
     WorldPacket packet;
-    data.BuildPacket(&packet, hasTransport);
-    player->GetSession()->SendPacket(&packet);
+    data.BuildPacket(packet, hasTransport);
+    player->GetSession()->SendPacket(packet);
 }
 
-void Map::SendInitTransports(Player* player)
+void Map::SendInitTransports(Player* player) const
 {
     // Hack to send out transports
     MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
@@ -932,11 +958,11 @@ void Map::SendInitTransports(Player* player)
     }
 
     WorldPacket packet;
-    transData.BuildPacket(&packet, hasTransport);
-    player->GetSession()->SendPacket(&packet);
+    transData.BuildPacket(packet, hasTransport);
+    player->GetSession()->SendPacket(packet);
 }
 
-void Map::SendRemoveTransports(Player* player)
+void Map::SendRemoveTransports(Player* player) const
 {
     // Hack to send out transports
     MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
@@ -955,8 +981,8 @@ void Map::SendRemoveTransports(Player* player)
             (*i)->BuildOutOfRangeUpdateBlock(&transData);
 
     WorldPacket packet;
-    transData.BuildPacket(&packet);
-    player->GetSession()->SendPacket(&packet);
+    transData.BuildPacket(packet);
+    player->GetSession()->SendPacket(packet);
 }
 
 inline void Map::setNGrid(NGridType* grid, uint32 x, uint32 y)
@@ -972,6 +998,11 @@ inline void Map::setNGrid(NGridType* grid, uint32 x, uint32 y)
 void Map::AddObjectToRemoveList(WorldObject* obj)
 {
     MANGOS_ASSERT(obj->GetMapId() == GetId() && obj->GetInstanceId() == GetInstanceId());
+
+    if (Creature* creature = obj->ToCreature())
+        sEluna->OnRemove(creature);
+    else if (GameObject* gameobject = obj->ToGameObject())
+        sEluna->OnRemove(gameobject);
 
     obj->CleanupsBeforeDelete();                            // remove or simplify at least cross referenced links
 
@@ -1028,10 +1059,24 @@ uint32 Map::GetPlayersCountExceptGMs() const
     return count;
 }
 
-void Map::SendToPlayers(WorldPacket const* data) const
+void Map::SendToPlayers(WorldPacket const& data) const
 {
     for (MapRefManager::const_iterator itr = m_mapRefManager.begin(); itr != m_mapRefManager.end(); ++itr)
         itr->getSource()->GetSession()->SendPacket(data);
+}
+
+bool Map::SendToPlayersInZone(WorldPacket const& data, uint32 zoneId) const
+{
+    bool foundPlayer = false;
+    for (MapRefManager::const_iterator itr = m_mapRefManager.begin(); itr != m_mapRefManager.end(); ++itr)
+    {
+        if (itr->getSource()->GetZoneId() == zoneId)
+        {
+            itr->getSource()->GetSession()->SendPacket(data);
+            foundPlayer = true;
+        }
+    }
+    return foundPlayer;
 }
 
 bool Map::ActiveObjectsNearGrid(uint32 x, uint32 y) const
@@ -1139,26 +1184,31 @@ void Map::RemoveFromActive(WorldObject* obj)
 
 void Map::CreateInstanceData(bool load)
 {
-    if (i_data != NULL)
+    if (i_data != nullptr)
         return;
 
-    if (Instanceable())
-    {
-        if (InstanceTemplate const* mInstance = ObjectMgr::GetInstanceTemplate(GetId()))
-            i_script_id = mInstance->script_id;
-    }
-    else
-    {
-        if (WorldTemplate const* mInstance = ObjectMgr::GetWorldTemplate(GetId()))
-            i_script_id = mInstance->script_id;
-    }
+    i_data = sEluna->GetInstanceData(this);
 
-    if (!i_script_id)
-        return;
-
-    i_data = sScriptMgr.CreateInstanceData(this);
     if (!i_data)
-        return;
+    {
+        if (Instanceable())
+        {
+            if (InstanceTemplate const* mInstance = ObjectMgr::GetInstanceTemplate(GetId()))
+                i_script_id = mInstance->script_id;
+        }
+        else
+        {
+            if (WorldTemplate const* mInstance = ObjectMgr::GetWorldTemplate(GetId()))
+                i_script_id = mInstance->script_id;
+        }
+
+        if (!i_script_id)
+            return;
+
+        i_data = sScriptMgr.CreateInstanceData(this);
+        if (!i_data)
+            return;
+    }
 
     if (load)
     {
@@ -1193,6 +1243,38 @@ void Map::CreateInstanceData(bool load)
         DEBUG_LOG("New instance data, \"%s\" ,initialized!", sScriptMgr.GetScriptName(i_script_id));
         i_data->Initialize();
     }
+}
+
+void Map::TeleportAllPlayersTo(TeleportLocation loc)
+{
+    while (HavePlayers())
+    {
+        if (Player* plr = m_mapRefManager.getFirst()->getSource())
+        {
+            // Teleport to specified location and removes the player from this map (if the map exists).
+            // Todo : we can add some specific location if needed (ex: map exit location for dungeon)
+            switch (loc)
+            {
+                case TELEPORT_LOCATION_HOMEBIND:
+                    plr->TeleportToHomebind();
+                    break;
+                case TELEPORT_LOCATION_BG_ENTRY_POINT:
+                    plr->TeleportToBGEntryPoint();
+                    break;
+                default:
+                    break;
+            }
+            // just in case, remove the player from the list explicitly here as well to prevent a possible infinite loop
+            // note that this remove is not needed if the code works well in other places
+            plr->GetMapRef().unlink();
+        }
+    }
+}
+
+void Map::SetWeather(uint32 zoneId, WeatherType type, float grade, bool permanently)
+{
+    Weather* wth = m_weatherSystem->FindOrCreateWeather(zoneId);
+    wth->SetWeather(WeatherType(type), grade, this, permanently);
 }
 
 template void Map::Add(Corpse*);
@@ -1314,7 +1396,7 @@ bool DungeonMap::Add(Player* player)
                     if (groupBind->state)
                         sLog.outError("GroupBind save players: %d, group count: %d", groupBind->state->GetPlayerCount(), groupBind->state->GetGroupCount());
                     else
-                        sLog.outError("GroupBind save NULL");
+                        sLog.outError("GroupBind save nullptr");
                     MANGOS_ASSERT(false);
                 }
                 // if the group/leader is permanently bound to the instance
@@ -1323,7 +1405,7 @@ bool DungeonMap::Add(Player* player)
                 {
                     WorldPacket data(SMSG_INSTANCE_SAVE_CREATED, 4);
                     data << uint32(0);
-                    player->GetSession()->SendPacket(&data);
+                    player->GetSession()->SendPacket(data);
                     player->BindToInstance(GetPersistanceState(), true);
                 }
             }
@@ -1430,7 +1512,7 @@ void DungeonMap::PermBindAllPlayers(Player* player)
             plr->BindToInstance(GetPersistanceState(), true);
             WorldPacket data(SMSG_INSTANCE_SAVE_CREATED, 4);
             data << uint32(0);
-            plr->GetSession()->SendPacket(&data);
+            plr->GetSession()->SendPacket(data);
         }
 
         // if the leader is not in the instance the group will not get a perm bind
@@ -1441,15 +1523,7 @@ void DungeonMap::PermBindAllPlayers(Player* player)
 
 void DungeonMap::UnloadAll(bool pForce)
 {
-    if (HavePlayers())
-    {
-        sLog.outError("DungeonMap::UnloadAll: there are still players in the instance at unload, should not happen!");
-        for (MapRefManager::iterator itr = m_mapRefManager.begin(); itr != m_mapRefManager.end(); ++itr)
-        {
-            Player* plr = itr->getSource();
-            plr->TeleportToHomebind();
-        }
-    }
+    TeleportAllPlayersTo(TELEPORT_LOCATION_HOMEBIND);
 
     if (m_resetAfterUnload == true)
         GetPersistanceState()->DeleteRespawnTimes();
@@ -1546,17 +1620,7 @@ void BattleGroundMap::SetUnload()
 
 void BattleGroundMap::UnloadAll(bool pForce)
 {
-    while (HavePlayers())
-    {
-        if (Player* plr = m_mapRefManager.getFirst()->getSource())
-        {
-            plr->TeleportTo(plr->GetBattleGroundEntryPoint());
-            // TeleportTo removes the player from this map (if the map exists) -> calls BattleGroundMap::Remove -> invalidates the iterator.
-            // just in case, remove the player from the list explicitly here as well to prevent a possible infinite loop
-            // note that this remove is not needed if the code works well in other places
-            plr->GetMapRef().unlink();
-        }
-    }
+    TeleportAllPlayersTo(TELEPORT_LOCATION_BG_ENTRY_POINT);
 
     Map::UnloadAll(pForce);
 }
@@ -1684,7 +1748,7 @@ void Map::ScriptsProcess()
 Player* Map::GetPlayer(ObjectGuid guid)
 {
     Player* plr = ObjectAccessor::FindPlayer(guid);         // return only in world players
-    return plr && plr->GetMap() == this ? plr : NULL;
+    return plr && plr->GetMap() == this ? plr : nullptr;
 }
 
 /**
@@ -1694,7 +1758,7 @@ Player* Map::GetPlayer(ObjectGuid guid)
  */
 Creature* Map::GetCreature(ObjectGuid guid)
 {
-    return m_objectsStore.find<Creature>(guid, (Creature*)NULL);
+    return m_objectsStore.find<Creature>(guid, (Creature*)nullptr);
 }
 
 /**
@@ -1704,7 +1768,7 @@ Creature* Map::GetCreature(ObjectGuid guid)
  */
 Pet* Map::GetPet(ObjectGuid guid)
 {
-    return m_objectsStore.find<Pet>(guid, (Pet*)NULL);
+    return m_objectsStore.find<Pet>(guid, (Pet*)nullptr);
 }
 
 /**
@@ -1714,10 +1778,10 @@ Pet* Map::GetPet(ObjectGuid guid)
  *
  * @param guid must be corpse guid (HIGHGUID_CORPSE)
  */
-Corpse* Map::GetCorpse(ObjectGuid guid)
+Corpse* Map::GetCorpse(ObjectGuid guid) const
 {
     Corpse* ret = ObjectAccessor::GetCorpseInMap(guid, GetId());
-    return ret && ret->GetInstanceId() == GetInstanceId() ? ret : NULL;
+    return ret && ret->GetInstanceId() == GetInstanceId() ? ret : nullptr;
 }
 
 /**
@@ -1734,7 +1798,7 @@ Creature* Map::GetAnyTypeCreature(ObjectGuid guid)
         default:                    break;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 /**
@@ -1744,7 +1808,7 @@ Creature* Map::GetAnyTypeCreature(ObjectGuid guid)
  */
 GameObject* Map::GetGameObject(ObjectGuid guid)
 {
-    return m_objectsStore.find<GameObject>(guid, (GameObject*)NULL);
+    return m_objectsStore.find<GameObject>(guid, (GameObject*)nullptr);
 }
 
 /**
@@ -1754,7 +1818,7 @@ GameObject* Map::GetGameObject(ObjectGuid guid)
  */
 DynamicObject* Map::GetDynamicObject(ObjectGuid guid)
 {
-    return m_objectsStore.find<DynamicObject>(guid, (DynamicObject*)NULL);
+    return m_objectsStore.find<DynamicObject>(guid, (DynamicObject*)nullptr);
 }
 
 /**
@@ -1784,19 +1848,19 @@ WorldObject* Map::GetWorldObject(ObjectGuid guid)
         case HIGHGUID_GAMEOBJECT:   return GetGameObject(guid);
         case HIGHGUID_UNIT:         return GetCreature(guid);
         case HIGHGUID_PET:          return GetPet(guid);
-        case HIGHGUID_DYNAMICOBJECT:return GetDynamicObject(guid);
+        case HIGHGUID_DYNAMICOBJECT: return GetDynamicObject(guid);
         case HIGHGUID_CORPSE:
         {
             // corpse special case, it can be not in world
             Corpse* corpse = GetCorpse(guid);
-            return corpse && corpse->IsInWorld() ? corpse : NULL;
+            return corpse && corpse->IsInWorld() ? corpse : nullptr;
         }
         case HIGHGUID_MO_TRANSPORT:
         case HIGHGUID_TRANSPORT:
         default:                    break;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 void Map::SendObjectUpdates()
@@ -1813,8 +1877,8 @@ void Map::SendObjectUpdates()
     WorldPacket packet;                                     // here we allocate a std::vector with a size of 0x10000
     for (UpdateDataMapType::iterator iter = update_players.begin(); iter != update_players.end(); ++iter)
     {
-        iter->second.BuildPacket(&packet);
-        iter->first->GetSession()->SendPacket(&packet);
+        iter->second.BuildPacket(packet);
+        iter->first->GetSession()->SendPacket(packet);
         packet.clear();                                     // clean the string
     }
 }
@@ -1878,7 +1942,7 @@ class StaticMonsterChatBuilder
  * @param guid must be creature guid of whom to Simulate the yell, non-creature guids not supported at this moment
  * @param textId Id of the simulated text
  * @param language language of the text
- * @param target, can be NULL
+ * @param target, can be nullptr
  */
 void Map::MonsterYellToMap(ObjectGuid guid, int32 textId, Language language, Unit const* target) const
 {
@@ -1907,7 +1971,7 @@ void Map::MonsterYellToMap(ObjectGuid guid, int32 textId, Language language, Uni
  * @param cinfo must be entry of Creature of whom to Simulate the yell
  * @param textId Id of the simulated text
  * @param language language of the text
- * @param target, can be NULL
+ * @param target, can be nullptr
  * @param senderLowGuid provide way proper show yell for near spawned creature with known lowguid,
  *        0 accepted by client else if this not important
  */
@@ -1935,7 +1999,7 @@ void Map::PlayDirectSoundToMap(uint32 soundId, uint32 zoneId /*=0*/) const
     Map::PlayerList const& pList = GetPlayers();
     for (PlayerList::const_iterator itr = pList.begin(); itr != pList.end(); ++itr)
         if (!zoneId || itr->getSource()->GetZoneId() == zoneId)
-            itr->getSource()->SendDirectMessage(&data);
+            itr->getSource()->SendDirectMessage(data);
 }
 
 /**
@@ -1975,6 +2039,61 @@ bool Map::GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float
     return result0 || result1;
 }
 
+// Find an height within a reasonable range of provided Z. This method may fail so we have to handle that case.
+bool Map::GetHeightInRange(float x, float y, float& z, float maxSearchDist /*= 4.0f*/) const
+{
+    float height, vmapHeight, mapHeight;
+    vmapHeight = VMAP_INVALID_HEIGHT_VALUE;
+
+    VMAP::IVMapManager* vmgr = VMAP::VMapFactory::createOrGetVMapManager();
+    if (!vmgr->isLineOfSightCalcEnabled())
+        vmgr = nullptr;
+
+    if (vmgr)
+    {
+        // pure vmap search
+        vmapHeight = vmgr->getHeight(i_id, x, y, z + 2.0f, maxSearchDist + 2.0f);
+    }
+
+    // find raw height from .map file on X,Y coordinates
+    if (GridMap* gmap = const_cast<TerrainInfo*>(m_TerrainData)->GetGrid(x, y)) // TODO:: find a way to remove that const_cast
+        mapHeight = gmap->getHeight(x, y);
+
+    float diffMaps = fabs(fabs(z) - fabs(mapHeight));
+    float diffVmaps = fabs(fabs(z) - fabs(vmapHeight));
+    if (diffVmaps < maxSearchDist)
+    {
+        if (diffMaps < maxSearchDist)
+        {
+            // well we simply have to take the highest as normally there we cannot be on top of cavern is maxSearchDist is not too big
+            if (vmapHeight > mapHeight)
+                height = vmapHeight;
+            else
+                height = mapHeight;
+
+            //sLog.outString("vmap %5.4f, map %5.4f, height %5.4f", vmapHeight, mapHeight, height);
+        }
+        else
+        {
+            //sLog.outString("vmap %5.4f", vmapHeight);
+            height = vmapHeight;
+        }
+    }
+    else
+    {
+        if (diffMaps < maxSearchDist)
+        {
+            //sLog.outString("map %5.4f", mapHeight);
+            height = mapHeight;
+        }
+        else
+            return false;
+    }
+
+    z = std::max<float>(height, m_dyn_tree.getHeight(x, y, height + 1.0f, maxSearchDist));
+    return true;
+}
+
 float Map::GetHeight(float x, float y, float z) const
 {
     float staticHeight = m_TerrainData->GetHeightStatic(x, y, z);
@@ -1997,4 +2116,176 @@ void Map::RemoveGameObjectModel(const GameObjectModel& mdl)
 bool Map::ContainsGameObjectModel(const GameObjectModel& mdl) const
 {
     return m_dyn_tree.contains(mdl);
+}
+
+// This will generate a random point to all directions in water for the provided point in radius range.
+bool Map::GetRandomPointUnderWater(float& x, float& y, float& z, float radius, GridMapLiquidData& liquid_status) const
+{
+    const float angle = rand_norm_f() * (M_PI_F * 2.0f);
+    const float range = rand_norm_f() * radius;
+
+    float i_x = x + range * cos(angle);
+    float i_y = y + range * sin(angle);
+
+    // get real ground of new point
+    // the code consider cylinder instead of sphere for possible z
+    float ground = GetHeight(i_x, i_y, z);
+    if (ground > INVALID_HEIGHT) // GetHeight can fail
+    {
+        float min_z = z - 0.7f * radius; // 0.7 to have a bit a "flat" cylinder, TODO which value looks nicest
+        if (min_z < ground)
+            min_z = ground + 0.5f; // Get some space to prevent under map
+
+        float liquidLevel = liquid_status.level - 2.0f; // just to make the generated point is in water and not on surface or a bit above
+
+        // if not enough space to fit the creature better is to return from here
+        if (min_z > liquidLevel)
+            return false;
+
+        float max_z = std::max(z + 0.7f * radius, min_z);
+        max_z = std::min(max_z, liquidLevel);
+        x = i_x;
+        y = i_y;
+        z = min_z + rand_norm_f() * (max_z - min_z);
+        return true;
+    }
+    return false;
+}
+
+// This will generate a random point to all directions in air for the provided point in radius range.
+bool Map::GetRandomPointInTheAir(float& x, float& y, float& z, float radius) const
+{
+    const float angle = rand_norm_f() * (M_PI_F * 2.0f);
+    const float range = rand_norm_f() * radius;
+
+    float i_x = x + range * cos(angle);
+    float i_y = y + range * sin(angle);
+
+    // get real ground of new point
+    // the code consider cylinder instead of sphere for possible z
+    float ground = GetHeight(i_x, i_y, z);
+    if (ground > INVALID_HEIGHT) // GetHeight can fail
+    {
+        float min_z = z - 0.7f * radius; // 0.7 to have a bit a "flat" cylinder, TODO which value looks nicest
+        if (min_z < ground)
+            min_z = ground + 2.5f; // Get some space to prevent landing
+        float max_z = std::max(z + 0.7f * radius, min_z);
+        x = i_x;
+        y = i_y;
+        z = min_z + rand_norm_f() * (max_z - min_z);
+        return true;
+    }
+    return false;
+}
+
+// supposed to be used for not big radius, usually less than 20.0f
+bool Map::GetReachableRandomPointOnGround(float& x, float& y, float& z, float radius) const
+{
+    // Generate a random range and direction for the new point
+    const float angle = rand_norm_f() * (M_PI_F * 2.0f);
+    const float range = rand_norm_f() * radius;
+
+    float i_x = x + range * cos(angle);
+    float i_y = y + range * sin(angle);
+    float i_z = z + 1.0f;
+
+    GetHitPosition(x, y, z + 1.0f, i_x, i_y, i_z, -0.5f);
+    i_z = z; // reset i_z to z value to avoid too much difference from original point before GetHeightInRange
+    if (!GetHeightInRange(i_x, i_y, i_z)) // GetHeight can fail
+        return false;
+
+    // here we have a valid position but the point can have a big Z in some case
+    // next code will check angle from 2 points
+    //        c
+    //       /|
+    //      / |
+    //    b/__|a
+
+    // project vector to get only positive value
+    float ab = fabs(x - i_x);
+    float ac = fabs(z - i_z);
+
+    // slope represented by c angle (in radian)
+    const float MAX_SLOPE_IN_RADIAN = 50.0f / 180.0f * M_PI_F;  // 50(degree) max seem best value for walkable slope
+
+    // check ab vector to avoid divide by 0
+    if (ab > 0.0f)
+    {
+        // compute c angle and convert it from radian to degree
+        float slope = atan(ac / ab);
+        if (slope < MAX_SLOPE_IN_RADIAN)
+        {
+            x = i_x;
+            y = i_y;
+            z = i_z;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Get random point by handling different situation depending of if the unit is flying/swimming/walking
+bool Map::GetReachableRandomPosition(Unit* unit, float& x, float& y, float& z, float radius) const
+{
+    float i_x = x;
+    float i_y = y;
+    float i_z = z;
+
+    bool isFlying;
+    bool isSwimming = true;
+    switch (unit->GetTypeId())
+    {
+        case TYPEID_PLAYER:
+            isFlying = static_cast<Player*>(unit)->IsFlying();
+            break;
+        case TYPEID_UNIT:
+            isFlying = static_cast<Creature*>(unit)->IsFlying();
+            isSwimming = static_cast<Creature*>(unit)->IsSwimming();
+            break;
+        default:
+            sLog.outError("Map::GetReachableRandomPosition> Unsupported unit type is passed!");
+            return false;
+    }
+
+    if (radius < 0.1f)
+    {
+        sLog.outError("Map::GetReachableRandomPosition> Unsupported unit type is passed!");
+        return false;
+    }
+
+    bool newDestAssigned;   // used to check if new random destination is found
+    if (isFlying)
+    {
+        newDestAssigned = GetRandomPointInTheAir(i_x, i_y, i_z, radius);
+        /*if (newDestAssigned)
+        sLog.outString("Generating air random point for %s", GetGuidStr().c_str());*/
+    }
+    else
+    {
+        GridMapLiquidData liquid_status;
+        GridMapLiquidStatus res = m_TerrainData->getLiquidStatus(i_x, i_y, i_z, MAP_ALL_LIQUIDS, &liquid_status);
+        if (isSwimming && (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER)))
+        {
+            newDestAssigned = GetRandomPointUnderWater(i_x, i_y, i_z, radius, liquid_status);
+            /*if (newDestAssigned)
+            sLog.outString("Generating swim random point for %s", GetGuidStr().c_str());*/
+        }
+        else
+        {
+            newDestAssigned = GetReachableRandomPointOnGround(i_x, i_y, i_z, radius);
+            /*if (newDestAssigned)
+            sLog.outString("Generating ground random point for %s", GetGuidStr().c_str());*/
+        }
+    }
+
+    if (newDestAssigned)
+    {
+        x = i_x;
+        y = i_y;
+        z = i_z;
+        return true;
+    }
+
+    return false;
 }

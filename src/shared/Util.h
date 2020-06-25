@@ -52,8 +52,11 @@ MANGOS_DLL_SPEC uint32 urand(uint32 min, uint32 max);
 /* Return a random number in the range min..max (inclusive). */
 MANGOS_DLL_SPEC float frand(float min, float max);
 
+/* Return a random number in the range RAND32_MIN .. RAND32_MAX. */
+MANGOS_DLL_SPEC int32 irand();
+
 /* Return a random number in the range 0 .. RAND32_MAX. */
-MANGOS_DLL_SPEC int32 rand32();
+MANGOS_DLL_SPEC uint32 urand();
 
 /* Return a random double from 0.0 to 1.0 (exclusive). Floats support only 7 valid decimal digits.
  * A double supports up to 15 valid decimal digits and is used internally (RAND32_MAX has 10 digits).
@@ -226,7 +229,7 @@ inline bool isNumeric(std::wstring const& str)
     return true;
 }
 
-inline bool isBasicLatinString(std::wstring wstr, bool numericOrSpace)
+inline bool isBasicLatinString(const std::wstring& wstr, bool numericOrSpace)
 {
     for (size_t i = 0; i < wstr.size(); ++i)
         if (!isBasicLatinCharacter(wstr[i]) && (!numericOrSpace || !isNumericOrSpace(wstr[i])))
@@ -234,7 +237,7 @@ inline bool isBasicLatinString(std::wstring wstr, bool numericOrSpace)
     return true;
 }
 
-inline bool isExtendedLatinString(std::wstring wstr, bool numericOrSpace)
+inline bool isExtendedLatinString(const std::wstring& wstr, bool numericOrSpace)
 {
     for (size_t i = 0; i < wstr.size(); ++i)
         if (!isExtendedLatinCharacter(wstr[i]) && (!numericOrSpace || !isNumericOrSpace(wstr[i])))
@@ -242,7 +245,7 @@ inline bool isExtendedLatinString(std::wstring wstr, bool numericOrSpace)
     return true;
 }
 
-inline bool isCyrillicString(std::wstring wstr, bool numericOrSpace)
+inline bool isCyrillicString(const std::wstring& wstr, bool numericOrSpace)
 {
     for (size_t i = 0; i < wstr.size(); ++i)
         if (!isCyrillicCharacter(wstr[i]) && (!numericOrSpace || !isNumericOrSpace(wstr[i])))
@@ -250,7 +253,7 @@ inline bool isCyrillicString(std::wstring wstr, bool numericOrSpace)
     return true;
 }
 
-inline bool isEastAsianString(std::wstring wstr, bool numericOrSpace)
+inline bool isEastAsianString(const std::wstring& wstr, bool numericOrSpace)
 {
     for (size_t i = 0; i < wstr.size(); ++i)
         if (!isEastAsianCharacter(wstr[i]) && (!numericOrSpace || !isNumericOrSpace(wstr[i])))

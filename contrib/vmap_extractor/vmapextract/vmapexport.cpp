@@ -76,7 +76,7 @@ bool preciseVectorData = false;
 
 //static const char * szWorkDirMaps = ".\\Maps";
 const char* szWorkDirWmo = "./Buildings";
-const char* szRawVMAPMagic = "VMAPs04";
+const char* szRawVMAPMagic = "VMAPs05";
 
 // Local testing functions
 
@@ -291,7 +291,7 @@ bool scan_patches(char* scanmatch, std::vector<std::string>& pArchiveNames)
         {
             sprintf(path, "%s.MPQ", scanmatch);
         }
-#ifdef __linux__
+#ifndef _WIN32
         if (FILE* h = fopen64(path, "rb"))
 #else
         if (FILE* h = fopen(path, "rb"))
@@ -303,7 +303,7 @@ bool scan_patches(char* scanmatch, std::vector<std::string>& pArchiveNames)
         }
     }
 
-    return(true);
+    return (true);
 }
 
 bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
@@ -360,7 +360,7 @@ bool fillArchiveNameVector(std::vector<std::string>& pArchiveNames)
     printf("Scanning patch levels from data directory.\n");
     sprintf(path, "%spatch", input_path);
     if (!scan_patches(path, pArchiveNames))
-        return(false);
+        return (false);
 
     // now, scan for the patch levels in locale dirs
     printf("Scanning patch levels from locale directories.\n");
@@ -388,7 +388,7 @@ bool processArgv(int argc, char** argv)
 {
     bool result = true;
     hasInputPathParam = false;
-    bool preciseVectorData = false;
+    preciseVectorData = false;
 
     for (int i = 1; i < argc; ++i)
     {
@@ -475,7 +475,7 @@ int main(int argc, char** argv)
     //xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
     // Create the working directory
     if (mkdir(szWorkDirWmo
-#ifdef __linux__
+#ifndef _WIN32
               , 0711
 #endif
              ))

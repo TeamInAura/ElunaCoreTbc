@@ -22,7 +22,6 @@
 #include "ProgressBar.h"
 #include "Log.h"
 #include "MapPersistentStateMgr.h"
-#include "MapManager.h"
 #include "World.h"
 #include "Policies/Singleton.h"
 
@@ -126,7 +125,7 @@ void PoolObject::CheckEventLinkAndReport<GameObject>(uint32 poolId, int16 event_
 }
 
 template<>
-void PoolObject::CheckEventLinkAndReport<Pool>(uint32 poolId, int16 event_id, std::map<uint32, int16> const& creature2event, std::map<uint32, int16> const& go2event) const
+void PoolObject::CheckEventLinkAndReport<Pool>(uint32 /*poolId*/, int16 event_id, std::map<uint32, int16> const& creature2event, std::map<uint32, int16> const& go2event) const
 {
     sPoolMgr.CheckEventLinkAndReport(guid, event_id, creature2event, go2event);
 }
@@ -219,7 +218,7 @@ PoolObject* PoolGroup<T>::RollOne(SpawnedPoolData& spawns, uint32 triggerFrom)
             return &EqualChanced[index];
     }
 
-    return NULL;
+    return nullptr;
 }
 
 // Main method to despawn a creature or gameobject in a pool
@@ -410,7 +409,7 @@ void PoolGroup<Creature>::Spawn1Object(MapPersistentState& mapState, PoolObject*
             // for not loaded grid just update respawn time (avoid work for instances until implemented support)
             else if (!instantly)
             {
-                dataMapState->SaveCreatureRespawnTime(obj->guid, time(NULL) + data->spawntimesecs);
+                dataMapState->SaveCreatureRespawnTime(obj->guid, time(nullptr) + data->spawntimesecs);
             }
         }
     }
@@ -459,7 +458,7 @@ void PoolGroup<GameObject>::Spawn1Object(MapPersistentState& mapState, PoolObjec
             {
                 // for spawned by default object only
                 if (data->spawntimesecs >= 0)
-                    dataMapState->SaveGORespawnTime(obj->guid, time(NULL) + data->spawntimesecs);
+                    dataMapState->SaveGORespawnTime(obj->guid, time(nullptr) + data->spawntimesecs);
             }
         }
     }
@@ -510,7 +509,7 @@ void PoolGroup<Pool>::ReSpawn1Object(MapPersistentState& /*mapState*/, PoolObjec
 ////////////////////////////////////////////////////////////
 // Methods of class PoolManager
 
-PoolManager::PoolManager()
+PoolManager::PoolManager(): max_pool_id(0)
 {
 }
 
@@ -787,15 +786,6 @@ void PoolManager::LoadFromDB()
                 sLog.outErrorDb("`pool_gameobject` has a non existing gameobject spawn (GUID: %u) defined for pool id (%u), skipped.", guid, pool_id);
                 continue;
             }
-            GameObjectInfo const* goinfo = ObjectMgr::GetGameObjectInfo(data->id);
-            if (goinfo->type != GAMEOBJECT_TYPE_CHEST &&
-                    goinfo->type != GAMEOBJECT_TYPE_GOOBER &&
-                    goinfo->type != GAMEOBJECT_TYPE_FISHINGHOLE &&
-                    goinfo->type != GAMEOBJECT_TYPE_TRAP)
-            {
-                sLog.outErrorDb("`pool_gameobject` has a not lootable gameobject spawn (GUID: %u, type: %u) defined for pool id (%u), skipped.", guid, goinfo->type, pool_id);
-                continue;
-            }
             if (pool_id > max_pool_id)
             {
                 sLog.outErrorDb("`pool_gameobject` pool id (%i) is out of range compared to max pool id in `pool_template`, skipped.", pool_id);
@@ -857,15 +847,6 @@ void PoolManager::LoadFromDB()
             if (!data)
             {
                 sLog.outErrorDb("`pool_gameobject_template` has a non existing gameobject spawn (GUID: %u Entry %u) defined for pool id (%u), skipped.", guid, entry_id, pool_id);
-                continue;
-            }
-            GameObjectInfo const* goinfo = ObjectMgr::GetGameObjectInfo(data->id);
-            if (goinfo->type != GAMEOBJECT_TYPE_CHEST &&
-                    goinfo->type != GAMEOBJECT_TYPE_GOOBER &&
-                    goinfo->type != GAMEOBJECT_TYPE_FISHINGHOLE &&
-                    goinfo->type != GAMEOBJECT_TYPE_TRAP)
-            {
-                sLog.outErrorDb("`pool_gameobject_template` has a not lootable gameobject spawn (GUID: %u Entry %u Type: %u) defined for pool id (%u), skipped.", guid, entry_id, goinfo->type, pool_id);
                 continue;
             }
             if (pool_id > max_pool_id)
@@ -1026,6 +1007,8 @@ void PoolManager::LoadFromDB()
             }
         }
     }
+
+    sLog.outString();
 }
 
 // The initialize method will spawn all pools not in an event and not in another pool

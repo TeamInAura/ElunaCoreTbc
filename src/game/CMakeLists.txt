@@ -18,24 +18,60 @@
 
 set(LIBRARY_NAME game)
 
+add_definitions(-DDT_POLYREF64)
+
+# include external dependencies libs headers (warnings disabled)
+include_directories(SYSTEM
+  ${CMAKE_SOURCE_DIR}/dep/include/g3dlite
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation
+  ${CMAKE_SOURCE_DIR}/dep/include
+  ${MYSQL_INCLUDE_DIR}
+)
+
+# include additionals headers
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/vmap
+  ${CMAKE_CURRENT_SOURCE_DIR}/AI
   ${CMAKE_CURRENT_SOURCE_DIR}/AuctionHouseBot
   ${CMAKE_CURRENT_SOURCE_DIR}/BattleGround
   ${CMAKE_CURRENT_SOURCE_DIR}/LuaEngine
   ${CMAKE_CURRENT_SOURCE_DIR}/OutdoorPvP
-  ${CMAKE_SOURCE_DIR}/dep/include/g3dlite
-  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour
-  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/
-  ${CMAKE_SOURCE_DIR}/dep/include
   ${CMAKE_SOURCE_DIR}/dep/lualib
   ${CMAKE_SOURCE_DIR}/src/shared
   ${CMAKE_SOURCE_DIR}/src/framework
   ${CMAKE_BINARY_DIR}
   ${CMAKE_BINARY_DIR}/src/shared
-  ${MYSQL_INCLUDE_DIR}
-  ${ACE_INCLUDE_DIR}
+)
+
+set(SRC_GRP_AI
+    AI/AggressorAI.cpp
+    AI/AggressorAI.h
+    AI/CreatureAI.cpp
+    AI/CreatureAI.h
+    AI/CreatureAIImpl.h
+    AI/CreatureAIRegistry.cpp
+    AI/CreatureAIRegistry.h
+    AI/CreatureAISelector.cpp
+    AI/CreatureAISelector.h
+    AI/CreatureEventAI.cpp
+    AI/CreatureEventAI.h
+    AI/CreatureEventAIMgr.cpp
+    AI/CreatureEventAIMgr.h
+    AI/GuardAI.cpp
+    AI/GuardAI.h
+    AI/GuardianAI.cpp
+    AI/GuardianAI.h
+    AI/NullCreatureAI.cpp
+    AI/NullCreatureAI.h
+    AI/PetAI.cpp
+    AI/PetAI.h
+    AI/PossessedAI.h
+    AI/ReactorAI.cpp
+    AI/ReactorAI.h
+    AI/TotemAI.cpp
+    AI/TotemAI.h
 )
 
 set(SRC_GRP_AHBOT
@@ -67,31 +103,9 @@ set(SRC_GRP_BATTLEGROUND
     BattleGround/BattleGroundWS.h
 )
 
+file(GLOB SRC_FILES_LUAENGINE LuaEngine/*.cpp LuaEngine/*.h)
 set(SRC_GRP_LUAENGINE
-    LuaEngine/AuraMethods.h
-    LuaEngine/CorpseMethods.h
-    LuaEngine/CreatureMethods.h
-    LuaEngine/GameObjectMethods.h
-    LuaEngine/GlobalMethods.h
-    LuaEngine/GroupMethods.h
-    LuaEngine/GuildMethods.h
-    LuaEngine/HookMgr.cpp
-    LuaEngine/HookMgr.h
-    LuaEngine/Includes.h
-    LuaEngine/ItemMethods.h
-    LuaEngine/LuaEngine.cpp
-    LuaEngine/LuaEngine.h
-    LuaEngine/LuaFunctions.cpp
-    LuaEngine/MapMethods.h
-    LuaEngine/ObjectMethods.h
-    LuaEngine/PlayerMethods.h
-    LuaEngine/QueryMethods.h
-    LuaEngine/QuestMethods.h
-    LuaEngine/SpellMethods.h
-    LuaEngine/UnitMethods.h
-    LuaEngine/WeatherMethods.h
-    LuaEngine/WorldObjectMethods.h
-    LuaEngine/WorldPacketMethods.h
+    ${SRC_FILES_LUAENGINE}
 )
 
 set(SRC_GRP_CHAT_COMMANDS
@@ -145,8 +159,6 @@ set(SRC_GRP_MOVEMENT
 )
 
 set(SRC_GRP_OBJECT
-    AggressorAI.cpp
-    AggressorAI.h
     ArenaTeam.cpp
     ArenaTeam.h
     AuctionHouseMgr.cpp
@@ -159,17 +171,6 @@ set(SRC_GRP_OBJECT
     Corpse.h
     Creature.cpp
     Creature.h
-    CreatureAI.cpp
-    CreatureAI.h
-    CreatureAIImpl.h
-    CreatureAIRegistry.cpp
-    CreatureAIRegistry.h
-    CreatureAISelector.cpp
-    CreatureAISelector.h
-    CreatureEventAI.cpp
-    CreatureEventAI.h
-    CreatureEventAIMgr.cpp
-    CreatureEventAIMgr.h
     DynamicObject.cpp
     DynamicObject.h
     Formulas.h
@@ -177,8 +178,6 @@ set(SRC_GRP_OBJECT
     GameObject.h
     GMTicketMgr.cpp
     GMTicketMgr.h
-    GuardAI.cpp
-    GuardAI.h
     Guild.cpp
     Guild.h
     Item.cpp
@@ -188,8 +187,6 @@ set(SRC_GRP_OBJECT
     ItemPrototype.h
     LootMgr.cpp
     LootMgr.h
-    NullCreatureAI.cpp
-    NullCreatureAI.h
     Object.cpp
     Object.h
     ObjectAccessor.cpp
@@ -202,12 +199,8 @@ set(SRC_GRP_OBJECT
     ObjectPosSelector.h
     Pet.cpp
     Pet.h
-    PetAI.cpp
-    PetAI.h
     Player.cpp
     Player.h
-    ReactorAI.cpp
-    ReactorAI.h
     ReputationMgr.cpp
     ReputationMgr.h
     SocialMgr.cpp
@@ -219,8 +212,6 @@ set(SRC_GRP_OBJECT
     TemporarySummon.h
     Totem.cpp
     Totem.h
-    TotemAI.cpp
-    TotemAI.h
     TransportSystem.cpp
     TransportSystem.h
     Unit.cpp
@@ -279,8 +270,6 @@ set(SRC_GRP_SERVER
     WorldSession.h
     WorldSocket.cpp
     WorldSocket.h
-    WorldSocketMgr.cpp
-    WorldSocketMgr.h
 )
 
 set(SRC_GRP_TOOL
@@ -423,6 +412,7 @@ set(SRC_GRP_WORLD_HANDLERS
 )
 
 set(LIBRARY_SRCS
+    ${SRC_GRP_AI}
     ${SRC_GRP_AHBOT}
     ${SRC_GRP_BATTLEGROUND}
     ${SRC_GRP_LUAENGINE}
@@ -438,6 +428,11 @@ set(LIBRARY_SRCS
     ${SRC_GRP_WORLD_HANDLERS}
     pchdef.cpp
     pchdef.h
+)
+
+source_group("AI"
+  FILES
+    ${SRC_GRP_AI}
 )
 
 source_group("AhBot"
@@ -530,21 +525,10 @@ endif()
 
 add_dependencies(${LIBRARY_NAME} revision.h)
 add_dependencies(${LIBRARY_NAME} lualib)
-if(NOT ACE_USE_EXTERNAL)
-  add_dependencies(${LIBRARY_NAME} ACE_Project)
-endif()
 
 # Generate precompiled header
 if(PCH)
-  if(MSVC OR XCODE)
-    if(MSVC)
-      set(game_pch "${CMAKE_CURRENT_SOURCE_DIR}/pchdef.cpp")
-    endif()
-    add_native_precompiled_header(${LIBRARY_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/pchdef.h)
-  elseif(CMAKE_COMPILER_IS_GNUCXX)
-    add_precompiled_header(${LIBRARY_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/pchdef.h)
-    if(NOT ACE_USE_EXTERNAL)
-      add_dependencies(game_pch_dephelp ACE_Project)
-    endif()
-  endif()
+  cotire(${LIBRARY_NAME})
 endif()
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/LuaEngine/extensions DESTINATION ${BIN_DIR}/lua_scripts/)

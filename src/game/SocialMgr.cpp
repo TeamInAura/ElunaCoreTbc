@@ -28,7 +28,7 @@
 
 INSTANTIATE_SINGLETON_1(SocialMgr);
 
-PlayerSocial::PlayerSocial()
+PlayerSocial::PlayerSocial(): m_playerLowGuid(0)
 {
 }
 
@@ -132,24 +132,25 @@ void PlayerSocial::SendSocialList()
 
     for (PlayerSocialMap::iterator itr = m_playerSocialMap.begin(); itr != m_playerSocialMap.end(); ++itr)
     {
-        sSocialMgr.GetFriendInfo(plr, itr->first, itr->second);
+        FriendInfo& friendInfo = itr->second;
+        sSocialMgr.GetFriendInfo(plr, itr->first, friendInfo);
 
         data << ObjectGuid(HIGHGUID_PLAYER, itr->first);    // player guid
-        data << uint32(itr->second.Flags);                  // player flag (0x1-friend?, 0x2-ignored?, 0x4-muted?)
-        data << itr->second.Note;                           // string note
-        if (itr->second.Flags & SOCIAL_FLAG_FRIEND)         // if IsFriend()
+        data << uint32(friendInfo.Flags);                  // player flag (0x1-friend?, 0x2-ignored?, 0x4-muted?)
+        data << friendInfo.Note;                           // string note
+        if (friendInfo.Flags & SOCIAL_FLAG_FRIEND)         // if IsFriend()
         {
-            data << uint8(itr->second.Status);              // online/offline/etc?
-            if (itr->second.Status)                         // if online
+            data << uint8(friendInfo.Status);              // online/offline/etc?
+            if (friendInfo.Status)                         // if online
             {
-                data << uint32(itr->second.Area);           // player area
-                data << uint32(itr->second.Level);          // player level
-                data << uint32(itr->second.Class);          // player class
+                data << uint32(friendInfo.Area);           // player area
+                data << uint32(friendInfo.Level);          // player level
+                data << uint32(friendInfo.Class);          // player class
             }
         }
     }
 
-    plr->GetSession()->SendPacket(&data);
+    plr->GetSession()->SendPacket(data);
     DEBUG_LOG("WORLD: Sent SMSG_CONTACT_LIST");
 }
 
@@ -165,7 +166,8 @@ bool PlayerSocial::HasIgnore(ObjectGuid ignore_guid)
 {
     PlayerSocialMap::const_iterator itr = m_playerSocialMap.find(ignore_guid.GetCounter());
     if (itr != m_playerSocialMap.end())
-        return itr->second.Flags & SOCIAL_FLAG_IGNORED;
+        return !!(itr->second.Flags & SOCIAL_FLAG_IGNORED);
+
     return false;
 }
 
@@ -177,7 +179,7 @@ SocialMgr::~SocialMgr()
 {
 }
 
-void SocialMgr::GetFriendInfo(Player* player, uint32 friend_lowguid, FriendInfo& friendInfo)
+void SocialMgr::GetFriendInfo(Player* player, uint32 friend_lowguid, FriendInfo& friendInfo) const
 {
     if (!player)
         return;
@@ -218,11 +220,11 @@ void SocialMgr::GetFriendInfo(Player* player, uint32 friend_lowguid, FriendInfo&
     }
 }
 
-void SocialMgr::MakeFriendStatusPacket(FriendsResult result, uint32 guid, WorldPacket* data)
+void SocialMgr::MakeFriendStatusPacket(FriendsResult result, uint32 guid, WorldPacket& data)
 {
-    data->Initialize(SMSG_FRIEND_STATUS, 5);
-    *data << uint8(result);
-    *data << ObjectGuid(HIGHGUID_PLAYER, guid);
+    data.Initialize(SMSG_FRIEND_STATUS, 5);
+    data << uint8(result);
+    data << ObjectGuid(HIGHGUID_PLAYER, guid);
 }
 
 void SocialMgr::SendFriendStatus(Player* player, FriendsResult result, ObjectGuid friend_guid, bool broadcast)
@@ -232,7 +234,7 @@ void SocialMgr::SendFriendStatus(Player* player, FriendsResult result, ObjectGui
     FriendInfo fi;
 
     WorldPacket data;
-    MakeFriendStatusPacket(result, friend_lowguid, &data);
+    MakeFriendStatusPacket(result, friend_lowguid, data);
     GetFriendInfo(player, friend_lowguid, fi);
     switch (result)
     {
@@ -258,12 +260,12 @@ void SocialMgr::SendFriendStatus(Player* player, FriendsResult result, ObjectGui
     }
 
     if (broadcast)
-        BroadcastToFriendListers(player, &data);
+        BroadcastToFriendListers(player, data);
     else
-        player->GetSession()->SendPacket(&data);
+        player->GetSession()->SendPacket(data);
 }
 
-void SocialMgr::BroadcastToFriendListers(Player* player, WorldPacket* packet)
+void SocialMgr::BroadcastToFriendListers(Player* player, WorldPacket const& packet) const
 {
     if (!player)
         return;
@@ -302,10 +304,6 @@ PlayerSocial* SocialMgr::LoadFromDB(QueryResult* result, ObjectGuid guid)
     if (!result)
         return social;
 
-    uint32 friend_guid = 0;
-    uint32 flags = 0;
-    std::string note = "";
-
     // used to speed up check below. Using GetNumberOfSocialsWithFlag will cause unneeded iteration
     uint32 friendCounter = 0, ignoreCounter = 0;
 
@@ -313,9 +311,9 @@ PlayerSocial* SocialMgr::LoadFromDB(QueryResult* result, ObjectGuid guid)
     {
         Field* fields  = result->Fetch();
 
-        friend_guid = fields[0].GetUInt32();
-        flags = fields[1].GetUInt32();
-        note = fields[2].GetCppString();
+        uint32 friend_guid = fields[0].GetUInt32();
+        uint32 flags = fields[1].GetUInt32();
+        std::string note = fields[2].GetCppString();
 
         if ((flags & SOCIAL_FLAG_IGNORED) && ignoreCounter >= SOCIALMGR_IGNORE_LIMIT)
             continue;

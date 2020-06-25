@@ -69,11 +69,11 @@ void OutdoorPvPEP::HandlePlayerEnterZone(Player* player, bool isMainZone)
     {
         case ALLIANCE:
             if (m_towersAlliance > 0)
-                player->CastSpell(player, plaguelandsTowerBuffs[m_towersAlliance - 1].spellIdAlliance, true);
+                player->CastSpell(player, plaguelandsTowerBuffs[m_towersAlliance - 1].spellIdAlliance, TRIGGERED_OLD_TRIGGERED);
             break;
         case HORDE:
             if (m_towersHorde > 0)
-                player->CastSpell(player, plaguelandsTowerBuffs[m_towersHorde - 1].spellIdHorde, true);
+                player->CastSpell(player, plaguelandsTowerBuffs[m_towersHorde - 1].spellIdHorde, TRIGGERED_OLD_TRIGGERED);
             break;
         default:
             break;
@@ -96,7 +96,7 @@ void OutdoorPvPEP::HandleCreatureCreate(Creature* creature)
         case NPC_SPECTRAL_FLIGHT_MASTER:
             m_flightMaster = creature->GetObjectGuid();
             creature->setFaction(m_towerOwner[TOWER_ID_PLAGUEWOOD] == ALLIANCE ? FACTION_FLIGHT_MASTER_ALLIANCE : FACTION_FLIGHT_MASTER_HORDE);
-            creature->CastSpell(creature, m_towerOwner[TOWER_ID_PLAGUEWOOD] == ALLIANCE ? SPELL_SPIRIT_PARTICLES_BLUE : SPELL_SPIRIT_PARTICLES_RED, true);
+            creature->CastSpell(creature, m_towerOwner[TOWER_ID_PLAGUEWOOD] == ALLIANCE ? SPELL_SPIRIT_PARTICLES_BLUE : SPELL_SPIRIT_PARTICLES_RED, TRIGGERED_OLD_TRIGGERED);
             break;
         case NPC_LORDAERON_COMMANDER:
         case NPC_LORDAERON_SOLDIER:
@@ -145,10 +145,9 @@ void OutdoorPvPEP::HandleGameObjectCreate(GameObject* go)
     }
 }
 
-void OutdoorPvPEP::HandleObjectiveComplete(uint32 eventId, std::list<Player*> players, Team team)
+void OutdoorPvPEP::HandleObjectiveComplete(uint32 eventId, const std::list<Player*>& players, Team team)
 {
-    uint32 credit = 0;
-
+    uint32 credit;
     switch (eventId)
     {
         case EVENT_CROWNGUARD_PROGRESS_ALLIANCE:
@@ -171,12 +170,12 @@ void OutdoorPvPEP::HandleObjectiveComplete(uint32 eventId, std::list<Player*> pl
             return;
     }
 
-    for (std::list<Player*>::iterator itr = players.begin(); itr != players.end(); ++itr)
+    for (std::list<Player*>::const_iterator itr = players.begin(); itr != players.end(); ++itr)
     {
         if ((*itr) && (*itr)->GetTeam() == team)
         {
             (*itr)->KilledMonsterCredit(credit);
-            (*itr)->RewardHonor(NULL, 1, HONOR_REWARD_PLAGUELANDS);
+            (*itr)->RewardHonor(nullptr, 1, HONOR_REWARD_PLAGUELANDS);
         }
     }
 }

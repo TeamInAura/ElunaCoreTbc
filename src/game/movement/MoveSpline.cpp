@@ -77,7 +77,7 @@ namespace Movement
     {
         FallInitializer(float _start_elevation) : start_elevation(_start_elevation) {}
         float start_elevation;
-        inline int32 operator()(Spline<int32>& s, int32 i)
+        int32 operator()(Spline<int32>& s, int32 i)
         {
             return Movement::computeFallTime(start_elevation - s.getPoint(i + 1).z, false) * 1000.f;
         }
@@ -144,6 +144,13 @@ namespace Movement
         m_Id = args.splineId;
         point_Idx_offset = args.path_Idx_offset;
         time_passed = 0;
+
+        // detect Stop command
+        if (splineflags.done)
+        {
+            spline.clear();
+            return;
+        }
 
         init_spline(args);
     }

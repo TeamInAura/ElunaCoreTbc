@@ -19,8 +19,7 @@
 #ifndef MANGOS_OBJECTREGISTRY_H
 #define MANGOS_OBJECTREGISTRY_H
 
-#include "Platform/Define.h"
-#include "Utilities/UnorderedMapSet.h"
+#include "Common.h"
 #include "Policies/Singleton.h"
 
 #include <string>
@@ -29,8 +28,8 @@
 
 /** ObjectRegistry holds all registry item of the same type
  */
-template < class T, class Key = std::string >
-class MANGOS_DLL_DECL ObjectRegistry
+template<class T, class Key = std::string>
+class ObjectRegistry
 {
     public:
         typedef std::map<Key, T*> RegistryMapType;
@@ -39,7 +38,7 @@ class MANGOS_DLL_DECL ObjectRegistry
         const T* GetRegistryItem(Key key) const
         {
             typename RegistryMapType::const_iterator iter = i_registeredObjects.find(key);
-            return (iter == i_registeredObjects.end() ? NULL : iter->second);
+            return (iter == i_registeredObjects.end() ? nullptr : iter->second);
         }
 
         /// Inserts a registry item

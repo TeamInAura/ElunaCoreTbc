@@ -42,7 +42,7 @@ struct SkillDiscoveryEntry
 };
 
 typedef std::list<SkillDiscoveryEntry> SkillDiscoveryList;
-typedef UNORDERED_MAP<int32, SkillDiscoveryList> SkillDiscoveryMap;
+typedef std::unordered_map<int32, SkillDiscoveryList> SkillDiscoveryMap;
 
 static SkillDiscoveryMap SkillDiscoveryStore;
 
@@ -57,8 +57,8 @@ void LoadSkillDiscoveryTable()
 
     if (!result)
     {
-        sLog.outString();
         sLog.outString(">> Loaded 0 skill discovery definitions. DB table `skill_discovery_template` is empty.");
+        sLog.outString();
         return;
     }
 
@@ -85,7 +85,7 @@ void LoadSkillDiscoveryTable()
 
         if (reqSkillOrSpell > 0)                            // spell case
         {
-            SpellEntry const* reqSpellEntry = sSpellStore.LookupEntry(reqSkillOrSpell);
+            SpellEntry const* reqSpellEntry = sSpellTemplate.LookupEntry<SpellEntry>(reqSkillOrSpell);
             if (!reqSpellEntry)
             {
                 if (reportedReqSpells.find(reqSkillOrSpell) == reportedReqSpells.end())
@@ -133,8 +133,6 @@ void LoadSkillDiscoveryTable()
 
     delete result;
 
-    sLog.outString();
-    sLog.outString(">> Loaded %u skill discovery definitions", count);
     if (!ssNonDiscoverableEntries.str().empty())
         sLog.outErrorDb("Some items can't be successfully discovered: have in chance field value < 0.000001 in `skill_discovery_template` DB table . List:\n%s", ssNonDiscoverableEntries.str().c_str());
 }

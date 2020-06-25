@@ -24,7 +24,6 @@
 #include "SharedDefines.h"
 #include "OutdoorPvPMgr.h"
 
-// forward declaration
 class WorldPacket;
 class WorldObject;
 class Player;
@@ -50,7 +49,7 @@ typedef std::map<ObjectGuid /*playerGuid*/, bool /*isMainZone*/> GuidZoneMap;
 
 class OutdoorPvP
 {
-    friend class OutdoorPvPMgr;
+        friend class OutdoorPvPMgr;
 
     public:
         OutdoorPvP() {}
@@ -63,7 +62,7 @@ class OutdoorPvP
         virtual bool HandleEvent(uint32 /*eventId*/, GameObject* /*go*/) { return false; }
 
         // handle capture objective complete
-        virtual void HandleObjectiveComplete(uint32 /*eventId*/, std::list<Player*> /*players*/, Team /*team*/) {}
+        virtual void HandleObjectiveComplete(uint32 /*eventId*/, const std::list<Player*>& /*players*/, Team /*team*/) {}
 
         // Called when a creature is created
         virtual void HandleCreatureCreate(Creature* /*creature*/) {}
@@ -109,7 +108,7 @@ class OutdoorPvP
         void BuffTeam(Team team, uint32 spellId, bool remove = false);
 
         // get banner artkit based on controlling team
-        uint32 GetBannerArtKit(Team team, uint32 artKitAlliance = CAPTURE_ARTKIT_ALLIANCE, uint32 artKitHorde = CAPTURE_ARTKIT_HORDE, uint32 artKitNeutral = CAPTURE_ARTKIT_NEUTRAL);
+        uint32 GetBannerArtKit(Team team, uint32 artKitAlliance = CAPTURE_ARTKIT_ALLIANCE, uint32 artKitHorde = CAPTURE_ARTKIT_HORDE, uint32 artKitNeutral = CAPTURE_ARTKIT_NEUTRAL) const;
 
         // set banner visual
         void SetBannerVisual(const WorldObject* objRef, ObjectGuid goGuid, uint32 artKit, uint32 animId);

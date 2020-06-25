@@ -28,7 +28,6 @@
 #include "ScriptMgr.h"
 #include "SystemConfig.h"
 #include "revision.h"
-#include "revision_nr.h"
 #include "Util.h"
 
 bool ChatHandler::HandleHelpCommand(char* args)
@@ -83,7 +82,7 @@ bool ChatHandler::HandleStartCommand(char* /*args*/)
     }
 
     // cast spell Stuck
-    chr->CastSpell(chr, 7355, false);
+    chr->CastSpell(chr, 7355, TRIGGERED_NONE);
     return true;
 }
 
@@ -97,18 +96,14 @@ bool ChatHandler::HandleServerInfoCommand(char* /*args*/)
 
     char const* full;
     if (m_session)
-        full = _FULLVERSION(REVISION_DATE, REVISION_TIME, REVISION_NR, "|cffffffff|Hurl:" REVISION_ID "|h" REVISION_ID "|h|r");
+        full = _FULLVERSION(REVISION_DATE, REVISION_TIME, "|cffffffff|Hurl:" REVISION_ID "|h" REVISION_ID "|h|r");
     else
-        full = _FULLVERSION(REVISION_DATE, REVISION_TIME, REVISION_NR, REVISION_ID);
+        full = _FULLVERSION(REVISION_DATE, REVISION_TIME, REVISION_ID);
     SendSysMessage(full);
 
     if (sScriptMgr.IsScriptLibraryLoaded())
     {
-        char const* ver = sScriptMgr.GetScriptLibraryVersion();
-        if (ver && *ver)
-            PSendSysMessage(LANG_USING_SCRIPT_LIB, ver);
-        else
-            SendSysMessage(LANG_USING_SCRIPT_LIB_UNKNOWN);
+        SendSysMessage(LANG_USING_SCRIPT_LIB);
     }
     else
         SendSysMessage(LANG_USING_SCRIPT_LIB_NONE);
@@ -123,23 +118,25 @@ bool ChatHandler::HandleServerInfoCommand(char* /*args*/)
 
 bool ChatHandler::HandleDismountCommand(char* /*args*/)
 {
+    Player* player = m_session->GetPlayer();
+
     // If player is not mounted, so go out :)
-    if (!m_session->GetPlayer()->IsMounted())
+    if (!player->IsMounted())
     {
         SendSysMessage(LANG_CHAR_NON_MOUNTED);
         SetSentErrorMessage(true);
         return false;
     }
 
-    if (m_session->GetPlayer()->IsTaxiFlying())
+    if (player->IsTaxiFlying())
     {
         SendSysMessage(LANG_YOU_IN_FLIGHT);
         SetSentErrorMessage(true);
         return false;
     }
 
-    m_session->GetPlayer()->Unmount();
-    m_session->GetPlayer()->RemoveSpellsCausingAura(SPELL_AURA_MOUNTED);
+    player->Unmount();
+    player->RemoveSpellsCausingAura(SPELL_AURA_MOUNTED);
     return true;
 }
 
@@ -172,10 +169,11 @@ bool ChatHandler::HandleGMListIngameCommand(char* /*args*/)
         HashMapHolder<Player>::MapType& m = sObjectAccessor.GetPlayers();
         for (HashMapHolder<Player>::MapType::const_iterator itr = m.begin(); itr != m.end(); ++itr)
         {
-            AccountTypes itr_sec = itr->second->GetSession()->GetSecurity();
-            if ((itr->second->isGameMaster() || (itr_sec > SEC_PLAYER && itr_sec <= (AccountTypes)sWorld.getConfig(CONFIG_UINT32_GM_LEVEL_IN_GM_LIST))) &&
-                    (!m_session || itr->second->IsVisibleGloballyFor(m_session->GetPlayer())))
-                names.push_back(std::make_pair<std::string, bool>(GetNameLink(itr->second), itr->second->isAcceptWhispers()));
+            Player* player = itr->second;
+            AccountTypes security = player->GetSession()->GetSecurity();
+            if ((player->isGameMaster() || (security > SEC_PLAYER && security <= (AccountTypes)sWorld.getConfig(CONFIG_UINT32_GM_LEVEL_IN_GM_LIST))) &&
+                    (!m_session || player->IsVisibleGloballyFor(m_session->GetPlayer())))
+                names.push_back(std::make_pair<std::string, bool>(GetNameLink(player), player->isAcceptWhispers()));
         }
     }
 

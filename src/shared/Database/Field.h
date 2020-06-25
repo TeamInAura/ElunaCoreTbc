@@ -20,12 +20,18 @@
 #define FIELD_H
 
 #include "Common.h"
+#ifdef WIN32
+#include <WinSock2.h>
+#include <mysql/mysql.h>
+#else
+#include <mysql.h>
+#endif
 
 class Field
 {
     public:
 
-        enum DataTypes
+        enum SimpleDataTypes
         {
             DB_TYPE_UNKNOWN = 0x00,
             DB_TYPE_STRING  = 0x01,
@@ -34,13 +40,13 @@ class Field
             DB_TYPE_BOOL    = 0x04
         };
 
-        Field() : mValue(NULL), mType(DB_TYPE_UNKNOWN) {}
-        Field(const char* value, enum DataTypes type) : mValue(value), mType(type) {}
+        Field() : mValue(nullptr), mType(MYSQL_TYPE_NULL) {}
+        Field(const char* value, enum_field_types type) : mValue(value), mType(type) {}
 
         ~Field() {}
 
-        enum DataTypes GetType() const { return mType; }
-        bool IsNULL() const { return mValue == NULL; }
+        enum enum_field_types GetType() const { return mType; }
+        bool IsNULL() const { return mValue == nullptr; }
 
         const char* GetString() const { return mValue; }
         std::string GetCppString() const
@@ -55,17 +61,17 @@ class Field
         uint8 GetUInt8() const { return mValue ? static_cast<uint8>(atol(mValue)) : uint8(0); }
         uint16 GetUInt16() const { return mValue ? static_cast<uint16>(atol(mValue)) : uint16(0); }
         int16 GetInt16() const { return mValue ? static_cast<int16>(atol(mValue)) : int16(0); }
-        uint32 GetUInt32() const { return mValue ? static_cast<uint32>(atol(mValue)) : uint32(0); }
+        uint32 GetUInt32() const { return mValue ? static_cast<uint32>(atoll(mValue)) : uint32(0); }
         uint64 GetUInt64() const
         {
             uint64 value = 0;
-            if (!mValue || sscanf(mValue,UI64FMTD,&value) == -1)
+            if (!mValue || sscanf(mValue, UI64FMTD, &value) == -1)
                 return 0;
 
             return value;
         }
 
-        uint64 GetInt64() const
+        int64 GetInt64() const
         {
             int64 value = 0;
             if (!mValue || sscanf(mValue, SI64FMTD, &value) == -1)
@@ -74,7 +80,7 @@ class Field
             return value;
         }
 
-        void SetType(enum DataTypes type) { mType = type; }
+        void SetType(enum_field_types type) { mType = type; }
         // no need for memory allocations to store resultset field strings
         // all we need is to cache pointers returned by different DBMS APIs
         void SetValue(const char* value) { mValue = value; };
@@ -84,6 +90,6 @@ class Field
         Field& operator=(Field const&);
 
         const char* mValue;
-        enum DataTypes mType;
+        enum_field_types mType;
 };
 #endif

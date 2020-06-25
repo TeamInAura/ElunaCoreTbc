@@ -18,7 +18,6 @@
 
 #include "MoveSplineFlag.h"
 #include <math.h>
-#include <string>
 
 namespace Movement
 {
@@ -190,11 +189,11 @@ namespace Movement
     };
 
     template<class Flags, int N>
-    void print_flags(Flags t, const char*(&names)[N], std::string& str)
+    void print_flags(Flags t, const char* (&names)[N], std::string& str)
     {
         for (int i = 0; i < N; ++i)
         {
-            if ((t & (Flags)(1 << i)) && names[i] != NULL)
+            if ((t & (Flags)(1 << i)) && names[i] != nullptr)
                 str.append(" ").append(names[i]);
         }
     }

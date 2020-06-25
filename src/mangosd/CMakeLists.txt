@@ -46,22 +46,24 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/dep/include/gsoap
   ${CMAKE_SOURCE_DIR}/src/framework
   ${CMAKE_SOURCE_DIR}/src/game
+  ${CMAKE_SOURCE_DIR}/dep/lualib
+  ${CMAKE_SOURCE_DIR}/src/game/LuaEngine
   ${CMAKE_BINARY_DIR}
   ${CMAKE_BINARY_DIR}/src/shared
-  ${ACE_INCLUDE_DIR}
-  ${MYSQL_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR}
 )
+
+if(POSTGRESQL)
+  include_directories(${PGSQL_INCLUDE_DIR})
+else()
+  include_directories(${MYSQL_INCLUDE_DIR})
+endif()
 
 add_executable(${EXECUTABLE_NAME}
   ${EXECUTABLE_SRCS}
 )
 
 add_dependencies(${EXECUTABLE_NAME} revision.h)
-if(NOT ACE_USE_EXTERNAL)
-  add_dependencies(${EXECUTABLE_NAME} ACE_Project)
-# add_dependencies(${EXECUTABLE_NAME} ace)
-endif()
 
 target_link_libraries(${EXECUTABLE_NAME}
   game
@@ -69,7 +71,7 @@ target_link_libraries(${EXECUTABLE_NAME}
   framework
   g3dlite
   gsoap
-  ${ACE_LIBRARIES}
+  ${Boost_LIBRARIES}
 )
 
 if(WIN32)
@@ -97,11 +99,11 @@ endif()
 set(EXECUTABLE_LINK_FLAGS "")
 
 if(UNIX)
-  set(EXECUTABLE_LINK_FLAGS "-pthread ${EXECUTABLE_LINK_FLAGS} -rdynamic")
-endif()
-
-if(APPLE)
-  set(EXECUTABLE_LINK_FLAGS "-framework Carbon ${EXECUTABLE_LINK_FLAGS}")
+  if (APPLE)
+    set(EXECUTABLE_LINK_FLAGS "-pthread -framework Carbon")
+  else()
+    set(EXECUTABLE_LINK_FLAGS "-pthread -rdynamic")
+  endif()
 endif()
 
 set_target_properties(${EXECUTABLE_NAME} PROPERTIES LINK_FLAGS

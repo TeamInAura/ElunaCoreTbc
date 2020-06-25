@@ -21,21 +21,20 @@
 #include "ObjectMgr.h"
 #include "MapPersistentStateMgr.h"
 #include "Creature.h"
-#include "GameObject.h"
 #include "DynamicObject.h"
 #include "Corpse.h"
 #include "World.h"
 #include "CellImpl.h"
-#include "BattleGround/BattleGround.h"
+#include "GridDefines.h"
 
-class MANGOS_DLL_DECL ObjectGridRespawnMover
+class ObjectGridRespawnMover
 {
     public:
         ObjectGridRespawnMover() {}
 
         void Move(GridType& grid);
 
-        template<class T> void Visit(GridRefManager<T> &) {}
+        template<class T> void Visit(GridRefManager<T>&) {}
         void Visit(CreatureMapType& m);
 };
 
@@ -109,7 +108,7 @@ template<> void addUnitState(Creature* obj, CellPair const& cell_pair)
 template <class T>
 void LoadHelper(CellGuidSet const& guid_set, CellPair& cell, GridRefManager<T>& /*m*/, uint32& count, Map* map, GridType& grid)
 {
-    BattleGround* bg = map->IsBattleGroundOrArena() ? ((BattleGroundMap*)map)->GetBG() : NULL;
+    BattleGround* bg = map->IsBattleGroundOrArena() ? ((BattleGroundMap*)map)->GetBG() : nullptr;
 
     for (CellGuidSet::const_iterator i_guid = guid_set.begin(); i_guid != guid_set.end(); ++i_guid)
     {
@@ -266,12 +265,8 @@ ObjectGridUnloader::Unload(GridType& grid)
 
 template<class T>
 void
-ObjectGridUnloader::Visit(GridRefManager<T> &m)
+ObjectGridUnloader::Visit(GridRefManager<T>& m)
 {
-    // remove all cross-reference before deleting
-    for (typename GridRefManager<T>::iterator iter = m.begin(); iter != m.end(); ++iter)
-        iter->getSource()->CleanupsBeforeDelete();
-
     while (!m.isEmpty())
     {
         T* obj = m.getFirst()->getSource();

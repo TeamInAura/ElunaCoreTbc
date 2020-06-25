@@ -41,7 +41,7 @@ namespace VMAP
                     hit = true;
                 return result;
             }
-            bool didHit() { return hit; }
+            bool didHit() const { return hit; }
         protected:
             ModelInstance* prims;
             bool hit;
@@ -118,9 +118,9 @@ namespace VMAP
     }
 
     StaticMapTree::StaticMapTree(uint32 mapID, const std::string& basePath):
-        iMapID(mapID), iTreeValues(0), iBasePath(basePath)
+        iMapID(mapID), iIsTiled(false), iTreeValues(nullptr), iNTreeValues(0), iBasePath(basePath)
     {
-        if (iBasePath.length() > 0 && (iBasePath[iBasePath.length()-1] != '/' || iBasePath[iBasePath.length()-1] != '\\'))
+        if (iBasePath.length() > 0 && (iBasePath[iBasePath.length() - 1] != '/' || iBasePath[iBasePath.length() - 1] != '\\'))
         {
             iBasePath.append("/");
         }
@@ -173,7 +173,6 @@ namespace VMAP
 
     bool StaticMapTree::getObjectHitPos(const Vector3& pPos1, const Vector3& pPos2, Vector3& pResultHitPos, float pModifyDist) const
     {
-        bool result = false;
         float maxDist = (pPos2 - pPos1).magnitude();
         // valid map coords should *never ever* produce float overflow, but this would produce NaNs too:
         MANGOS_ASSERT(maxDist < std::numeric_limits<float>::max());
@@ -204,14 +203,10 @@ namespace VMAP
             {
                 pResultHitPos = pResultHitPos + dir * pModifyDist;
             }
-            result = true;
+            return true;
         }
-        else
-        {
-            pResultHitPos = pPos2;
-            result = false;
-        }
-        return result;
+        pResultHitPos = pPos2;
+        return false;
     }
 
     //=========================================================
@@ -234,7 +229,7 @@ namespace VMAP
     bool StaticMapTree::CanLoadMap(const std::string& vmapPath, uint32 mapID, uint32 tileX, uint32 tileY)
     {
         std::string basePath = vmapPath;
-        if (basePath.length() > 0 && (basePath[basePath.length()-1] != '/' || basePath[basePath.length()-1] != '\\'))
+        if (basePath.length() > 0 && (basePath[basePath.length() - 1] != '/' || basePath[basePath.length() - 1] != '\\'))
             basePath.append("/");
         std::string fullname = basePath + VMapManager2::getMapFileName(mapID);
         bool success = true;
@@ -283,7 +278,7 @@ namespace VMAP
             if (!readChunk(rf, chunk, VMAP_MAGIC, 8)) success = false;
             char tiled;
             if (success && fread(&tiled, sizeof(char), 1, rf) != 1) success = false;
-            iIsTiled = bool(tiled);
+            iIsTiled = !!tiled;
             // Nodes
             if (success && !readChunk(rf, chunk, "NODE", 4)) success = false;
             if (success) success = iTree.readFromFile(rf);
@@ -382,13 +377,12 @@ namespace VMAP
                     fread(&referencedVal, sizeof(uint32), 1, tf);
                     if (!iLoadedSpawns.count(referencedVal))
                     {
-#ifdef VMAP_DEBUG
                         if (referencedVal > iNTreeValues)
                         {
-                            DEBUG_LOG("invalid tree element! (%u/%u)", referencedVal, iNTreeValues);
+                            ERROR_LOG("invalid tree element! (%u/%u)", referencedVal, iNTreeValues);
                             continue;
                         }
-#endif
+
                         iTreeValues[referencedVal] = ModelInstance(spawn, model);
                         iLoadedSpawns[referencedVal] = 1;
                     }

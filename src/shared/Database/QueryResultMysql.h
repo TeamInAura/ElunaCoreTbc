@@ -24,7 +24,7 @@
 #include "Common.h"
 
 #ifdef WIN32
-#include <winsock2.h>
+#include <WinSock2.h>
 #include <mysql/mysql.h>
 #else
 #include <mysql.h>
@@ -39,8 +39,9 @@ class QueryResultMysql : public QueryResult
 
         bool NextRow() override;
 
+        static Field::SimpleDataTypes GetSimpleType(enum_field_types type);
+
     private:
-        enum Field::DataTypes ConvertNativeType(enum_field_types mysqlType) const;
         void EndQuery();
 
         MYSQL_RES* mResult;

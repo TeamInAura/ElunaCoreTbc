@@ -24,9 +24,8 @@
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "Chat.h"
-#include "HookMgr.h"
 
-void WorldSession::SendGMTicketGetTicket(uint32 status, GMTicket* ticket /*= NULL*/)
+void WorldSession::SendGMTicketGetTicket(uint32 status, GMTicket* ticket /*= nullptr*/) const
 {
     std::string text = ticket ? ticket->GetText() : "";
 
@@ -54,10 +53,10 @@ void WorldSession::SendGMTicketGetTicket(uint32 status, GMTicket* ticket /*= NUL
         data << uint8(0);                                   // if == 2 and next field == 1 then "Your ticket has been escalated"
         data << uint8(0);                                   // const
     }
-    SendPacket(&data);
+    SendPacket(data);
 }
 
-void WorldSession::HandleGMTicketGetTicketOpcode(WorldPacket & /*recv_data*/)
+void WorldSession::HandleGMTicketGetTicketOpcode(WorldPacket& /*recv_data*/)
 {
     SendQueryTimeResponse();
 
@@ -77,21 +76,15 @@ void WorldSession::HandleGMTicketUpdateTextOpcode(WorldPacket& recv_data)
         ticket->SetText(ticketText.c_str());
     else
         sLog.outError("Ticket update: Player %s (GUID: %u) doesn't have active ticket", GetPlayer()->GetName(), GetPlayer()->GetGUIDLow());
-
-    // used by eluna
-    sHookMgr.OnGmTicketUpdate(_player, ticketText);
 }
 
-void WorldSession::HandleGMTicketDeleteTicketOpcode(WorldPacket & /*recv_data*/)
+void WorldSession::HandleGMTicketDeleteTicketOpcode(WorldPacket& /*recv_data*/)
 {
     sTicketMgr.Delete(GetPlayer()->GetObjectGuid());
 
-    // used by eluna
-    sHookMgr.OnGmTicketDelete(_player);
-
     WorldPacket data(SMSG_GMTICKET_DELETETICKET, 4);
     data << uint32(9);
-    SendPacket(&data);
+    SendPacket(data);
 
     SendGMTicketGetTicket(0x0A);
 }
@@ -115,20 +108,17 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recv_data)
     {
         WorldPacket data(SMSG_GMTICKET_CREATE, 4);
         data << uint32(1);                                  // 1 - You already have GM ticket
-        SendPacket(&data);
+        SendPacket(data);
         return;
     }
 
     sTicketMgr.Create(_player->GetObjectGuid(), ticketText.c_str());
 
-    // used by eluna
-    sHookMgr.OnGmTicketCreate(_player, ticketText);
-
     SendQueryTimeResponse();
 
     WorldPacket data(SMSG_GMTICKET_CREATE, 4);
     data << uint32(2);                                      // 2 - nothing appears (3-error creating, 5-error updating)
-    SendPacket(&data);
+    SendPacket(data);
 
     // TODO: Guard player map
     HashMapHolder<Player>::MapType& m = sObjectAccessor.GetPlayers();
@@ -139,12 +129,12 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recv_data)
     }
 }
 
-void WorldSession::HandleGMTicketSystemStatusOpcode(WorldPacket & /*recv_data*/)
+void WorldSession::HandleGMTicketSystemStatusOpcode(WorldPacket& /*recv_data*/)
 {
     WorldPacket data(SMSG_GMTICKET_SYSTEMSTATUS, 4);
     data << uint32(1);                                      // we can also disable ticket system by sending 0 value
 
-    SendPacket(&data);
+    SendPacket(data);
 }
 
 void WorldSession::HandleGMSurveySubmitOpcode(WorldPacket& recv_data)

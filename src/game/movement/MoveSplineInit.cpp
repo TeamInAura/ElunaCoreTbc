@@ -28,14 +28,14 @@ namespace Movement
     {
         if (moveFlags & MOVEFLAG_FLYING)
         {
-            if (moveFlags& MOVEFLAG_BACKWARD /*&& speed_obj.flight >= speed_obj.flight_back*/)
+            if (moveFlags & MOVEFLAG_BACKWARD /*&& speed_obj.flight >= speed_obj.flight_back*/)
                 return MOVE_FLIGHT_BACK;
             else
                 return MOVE_FLIGHT;
         }
         else if (moveFlags & MOVEFLAG_SWIMMING)
         {
-            if (moveFlags& MOVEFLAG_BACKWARD /*&& speed_obj.swim >= speed_obj.swim_back*/)
+            if (moveFlags & MOVEFLAG_BACKWARD /*&& speed_obj.swim >= speed_obj.swim_back*/)
                 return MOVE_SWIM_BACK;
             else
                 return MOVE_SWIM;
@@ -45,7 +45,7 @@ namespace Movement
             // if ( speed_obj.run > speed_obj.walk )
             return MOVE_WALK;
         }
-        else if (moveFlags& MOVEFLAG_BACKWARD /*&& speed_obj.run >= speed_obj.run_back*/)
+        else if (moveFlags & MOVEFLAG_BACKWARD /*&& speed_obj.run >= speed_obj.run_back*/)
             return MOVE_RUN_BACK;
 
         return MOVE_RUN;
@@ -102,16 +102,65 @@ namespace Movement
         }
 
         PacketBuilder::WriteMonsterMove(move_spline, data);
-        unit.SendMessageToSet(&data, true);
+        unit.SendMessageToSet(data, true);
 
         return move_spline.Duration();
+    }
+
+    void MoveSplineInit::Stop(bool forceSend /*= false*/)
+    {
+        MoveSpline& move_spline = *unit.movespline;
+
+        // No need to stop if we are not moving
+        if (!forceSend && move_spline.Finalized())
+            return;
+
+        TransportInfo* transportInfo = unit.GetTransportInfo();
+
+        Location real_position(unit.GetPositionX(), unit.GetPositionY(), unit.GetPositionZ(), unit.GetOrientation());
+
+        // If boarded use current local position
+        if (transportInfo)
+            transportInfo->GetLocalPosition(real_position.x, real_position.y, real_position.z, real_position.orientation);
+
+        // there is a big chance that current position is unknown if current state is not finalized, need compute it
+        // this also allows calculate spline position and update map position in much greater intervals
+        if (!move_spline.Finalized() && !transportInfo)
+            real_position = move_spline.ComputePosition();
+
+        if (args.path.empty())
+        {
+            // should i do the things that user should do?
+            MoveTo(real_position);
+        }
+
+        // current first vertex
+        args.path[0] = real_position;
+
+        args.flags = MoveSplineFlag::Done;
+        unit.m_movementInfo.RemoveMovementFlag(MovementFlags(MOVEFLAG_FORWARD | MOVEFLAG_SPLINE_ENABLED));
+        move_spline.Initialize(args);
+
+        WorldPacket data(SMSG_MONSTER_MOVE, 64);
+        data << unit.GetPackGUID();
+
+        if (transportInfo)
+        {
+            data.SetOpcode(SMSG_MONSTER_MOVE_TRANSPORT);
+            data << transportInfo->GetTransportGuid().WriteAsPacked();
+        }
+
+        data << real_position.x << real_position.y << real_position.z;
+        data << move_spline.GetId();
+        data << uint8(MonsterMoveStop);
+        unit.SendMessageToSet(data, true);
     }
 
     MoveSplineInit::MoveSplineInit(Unit& m) : unit(m)
     {
         // mix existing state into new
         args.flags.runmode = !unit.m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE);
-        args.flags.flying = unit.m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_FLYING | MOVEFLAG_LEVITATING));
+        args.flags.flying = unit.m_movementInfo.HasMovementFlag((MovementFlags)(MOVEFLAG_CAN_FLY | MOVEFLAG_FLYING | MOVEFLAG_LEVITATING));
     }
 
     void MoveSplineInit::SetFacing(const Unit* target)

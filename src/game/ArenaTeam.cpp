@@ -349,8 +349,6 @@ void ArenaTeam::Disband(WorldSession* session)
 
 void ArenaTeam::Roster(WorldSession* session)
 {
-    Player* pl = NULL;
-
     WorldPacket data(SMSG_ARENA_TEAM_ROSTER, 100);
     data << uint32(GetId());                                // team id
     data << uint32(GetMembersSize());                       // members count
@@ -358,7 +356,7 @@ void ArenaTeam::Roster(WorldSession* session)
 
     for (MemberList::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
     {
-        pl = sObjectMgr.GetPlayer(itr->guid);
+        Player* pl = sObjectMgr.GetPlayer(itr->guid);
 
         data << itr->guid;                                  // guid
         data << uint8((pl ? 1 : 0));                        // online flag
@@ -373,11 +371,11 @@ void ArenaTeam::Roster(WorldSession* session)
         data << uint32(itr->personal_rating);               // personal rating
     }
 
-    session->SendPacket(&data);
+    session->SendPacket(data);
     DEBUG_LOG("WORLD: Sent SMSG_ARENA_TEAM_ROSTER");
 }
 
-void ArenaTeam::Query(WorldSession* session)
+void ArenaTeam::Query(WorldSession* session) const
 {
     WorldPacket data(SMSG_ARENA_TEAM_QUERY_RESPONSE, 4 * 7 + GetName().size() + 1);
     data << uint32(GetId());                                // team id
@@ -388,11 +386,11 @@ void ArenaTeam::Query(WorldSession* session)
     data << uint32(m_EmblemColor);                          // emblem color
     data << uint32(m_BorderStyle);                          // border style
     data << uint32(m_BorderColor);                          // border color
-    session->SendPacket(&data);
+    session->SendPacket(data);
     DEBUG_LOG("WORLD: Sent SMSG_ARENA_TEAM_QUERY_RESPONSE");
 }
 
-void ArenaTeam::Stats(WorldSession* session)
+void ArenaTeam::Stats(WorldSession* session) const
 {
     WorldPacket data(SMSG_ARENA_TEAM_STATS, 4 * 7);
     data << uint32(GetId());                                // team id
@@ -402,7 +400,7 @@ void ArenaTeam::Stats(WorldSession* session)
     data << uint32(m_stats.games_season);                   // played this season
     data << uint32(m_stats.wins_season);                    // wins this season
     data << uint32(m_stats.rank);                           // rank
-    session->SendPacket(&data);
+    session->SendPacket(data);
 }
 
 void ArenaTeam::NotifyStatsChanged()
@@ -432,7 +430,7 @@ void ArenaTeam::InspectStats(WorldSession* session, ObjectGuid guid)
     data << uint32(m_stats.wins_season);                    // season wins
     data << uint32(member->games_season);                   // played (count of all games, that the inspected member participated...)
     data << uint32(member->personal_rating);                // personal rating
-    session->SendPacket(&data);
+    session->SendPacket(data);
 }
 
 void ArenaTeam::SetEmblem(uint32 backgroundColor, uint32 emblemStyle, uint32 emblemColor, uint32 borderStyle, uint32 borderColor)
@@ -480,9 +478,9 @@ void ArenaTeam::SetStats(uint32 stat_type, uint32 value)
     }
 }
 
-void ArenaTeam::BroadcastPacket(WorldPacket* packet)
+void ArenaTeam::BroadcastPacket(WorldPacket const& packet) const
 {
-    for (MemberList::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+    for (MemberList::const_iterator itr = m_members.cbegin(); itr != m_members.cend(); ++itr)
     {
         Player* player = sObjectMgr.GetPlayer(itr->guid);
         if (player)
@@ -490,7 +488,7 @@ void ArenaTeam::BroadcastPacket(WorldPacket* packet)
     }
 }
 
-void ArenaTeam::BroadcastEvent(ArenaTeamEvents event, ObjectGuid guid, char const* str1 /*=NULL*/, char const* str2 /*=NULL*/, char const* str3 /*=NULL*/)
+void ArenaTeam::BroadcastEvent(ArenaTeamEvents event, ObjectGuid guid, char const* str1 /*=nullptr*/, char const* str2 /*=nullptr*/, char const* str3 /*=nullptr*/)
 {
     uint8 strCount = !str1 ? 0 : (!str2 ? 1 : (!str3 ? 2 : 3));
 
@@ -515,7 +513,7 @@ void ArenaTeam::BroadcastEvent(ArenaTeamEvents event, ObjectGuid guid, char cons
     if (guid)
         data << ObjectGuid(guid);
 
-    BroadcastPacket(&data);
+    BroadcastPacket(data);
 
     DEBUG_LOG("WORLD: Sent SMSG_ARENA_TEAM_EVENT");
 }
@@ -570,7 +568,7 @@ uint32 ArenaTeam::GetPoints(uint32 MemberRating)
     return (uint32) points;
 }
 
-float ArenaTeam::GetChanceAgainst(uint32 own_rating, uint32 enemy_rating)
+float ArenaTeam::GetChanceAgainst(uint32 own_rating, uint32 enemy_rating) const
 {
     // returns the chance to win against a team with the given rating, used in the rating adjustment calculation
     // ELO system

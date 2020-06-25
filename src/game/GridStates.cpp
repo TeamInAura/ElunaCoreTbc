@@ -17,12 +17,11 @@
  */
 
 #include "GridStates.h"
-#include "GridNotifiers.h"
-#include "GameSystem/Grid.h"
+#include "ObjectGridLoader.h"
 #include "Log.h"
 
 void
-InvalidState::Update(Map&, NGridType&, GridInfo&, const uint32 &/*x*/, const uint32 &/*y*/, const uint32&) const
+InvalidState::Update(Map&, NGridType&, GridInfo&, const uint32& /*x*/, const uint32& /*y*/, const uint32&) const
 {
 }
 

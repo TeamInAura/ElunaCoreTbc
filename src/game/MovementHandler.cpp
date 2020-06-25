@@ -21,7 +21,6 @@
 #include "WorldSession.h"
 #include "Opcodes.h"
 #include "Log.h"
-#include "Corpse.h"
 #include "Player.h"
 #include "MapManager.h"
 #include "Transports.h"
@@ -30,7 +29,9 @@
 #include "MapPersistentStateMgr.h"
 #include "ObjectMgr.h"
 
-void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket & /*recv_data*/)
+#define MOVEMENT_PACKET_TIME_DELAY 0
+
+void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("WORLD: got MSG_MOVE_WORLDPORT_ACK.");
     HandleMoveWorldportAckOpcode();
@@ -65,7 +66,7 @@ void WorldSession::HandleMoveWorldportAckOpcode()
     // get the destination map entry, not the current one, this will fix homebind and reset greeting
     MapEntry const* mEntry = sMapStore.LookupEntry(loc.mapid);
 
-    Map* map = NULL;
+    Map* map = nullptr;
 
     // prevent crash at attempt landing to not existed battleground instance
     if (mEntry->IsBattleGroundOrArena())
@@ -171,7 +172,7 @@ void WorldSession::HandleMoveWorldportAckOpcode()
     {
         if (time_t timeReset = sMapPersistentStateMgr.GetScheduler().GetResetTimeFor(mEntry->MapID))
         {
-            uint32 timeleft = uint32(timeReset - time(NULL));
+            uint32 timeleft = uint32(timeReset - time(nullptr));
             GetPlayer()->SendInstanceResetWarning(mEntry->MapID, timeleft);
         }
     }
@@ -182,13 +183,17 @@ void WorldSession::HandleMoveWorldportAckOpcode()
 
     // honorless target
     if (GetPlayer()->pvpInfo.inHostileArea)
-        GetPlayer()->CastSpell(GetPlayer(), 2479, true);
+        GetPlayer()->CastSpell(GetPlayer(), 2479, TRIGGERED_OLD_TRIGGERED);
 
     // resummon pet
     GetPlayer()->ResummonPetTemporaryUnSummonedIfAny();
 
     // lets process all delayed operations on successful teleport
     GetPlayer()->ProcessDelayedOperations();
+
+    // notify group after successful teleport
+    if (_player->GetGroup())
+        _player->SetGroupUpdateFlag(GROUP_UPDATE_FULL);
 }
 
 void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
@@ -205,7 +210,7 @@ void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Counter %u, time %u", counter, time / IN_MILLISECONDS);
 
     Unit* mover = _player->GetMover();
-    Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : NULL;
+    Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : nullptr;
 
     if (!plMover || !plMover->IsBeingTeleportedNear())
         return;
@@ -230,7 +235,7 @@ void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
     {
         // honorless target
         if (plMover->pvpInfo.inHostileArea)
-            plMover->CastSpell(plMover, 2479, true);
+            plMover->CastSpell(plMover, 2479, TRIGGERED_OLD_TRIGGERED);
     }
 
     // resummon pet
@@ -250,7 +255,7 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recv_data)
     }
 
     Unit* mover = _player->GetMover();
-    Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : NULL;
+    Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : nullptr;
 
     // ignore, waiting processing in WorldSession::HandleMoveWorldportAckOpcode and WorldSession::HandleMoveTeleportAck
     if (plMover && plMover->IsBeingTeleported())
@@ -278,9 +283,9 @@ void WorldSession::HandleMovementOpcodes(WorldPacket& recv_data)
         plMover->UpdateFallInformationIfNeed(movementInfo, opcode);
 
     WorldPacket data(opcode, recv_data.size());
-    data << mover->GetPackGUID();             // write guid
+    data << mover->GetPackGUID();                           // write guid
     movementInfo.Write(data);                               // write data
-    mover->SendMessageToSetExcept(&data, _player);
+    mover->SendMessageToSetExcept(data, _player);
 }
 
 void WorldSession::HandleForceSpeedChangeAckOpcodes(WorldPacket& recv_data)
@@ -377,7 +382,7 @@ void WorldSession::HandleMoveNotActiveMoverOpcode(WorldPacket& recv_data)
     recv_data >> old_mover_guid;
     recv_data >> mi;
 
-    if (_player->GetMover()->GetObjectGuid() == old_mover_guid)
+    if (_player->GetMover() && _player->GetMover()->GetObjectGuid() == old_mover_guid)
     {
         sLog.outError("HandleMoveNotActiveMover: incorrect mover guid: mover is %s and should be %s instead of %s",
                       _player->GetMover()->GetGuidStr().c_str(),
@@ -397,7 +402,7 @@ void WorldSession::HandleMountSpecialAnimOpcode(WorldPacket& /*recvdata*/)
     WorldPacket data(SMSG_MOUNTSPECIAL_ANIM, 8);
     data << GetPlayer()->GetObjectGuid();
 
-    GetPlayer()->SendMessageToSet(&data, false);
+    GetPlayer()->SendMessageToSet(data, false);
 }
 
 void WorldSession::HandleMoveKnockBackAck(WorldPacket& recv_data)
@@ -405,7 +410,7 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket& recv_data)
     DEBUG_LOG("CMSG_MOVE_KNOCK_BACK_ACK");
 
     Unit* mover = _player->GetMover();
-    Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : NULL;
+    Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : nullptr;
 
     // ignore, waiting processing in WorldSession::HandleMoveWorldportAckOpcode and WorldSession::HandleMoveTeleportAck
     if (plMover && plMover->IsBeingTeleported())
@@ -433,10 +438,10 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket& recv_data)
     data << movementInfo.GetJumpInfo().cosAngle;
     data << movementInfo.GetJumpInfo().xyspeed;
     data << movementInfo.GetJumpInfo().velocity;
-    mover->SendMessageToSetExcept(&data, _player);
+    mover->SendMessageToSetExcept(data, _player);
 }
 
-void WorldSession::SendKnockBack(float angle, float horizontalSpeed, float verticalSpeed)
+void WorldSession::SendKnockBack(float angle, float horizontalSpeed, float verticalSpeed) const
 {
     float vsin = sin(angle);
     float vcos = cos(angle);
@@ -448,7 +453,7 @@ void WorldSession::SendKnockBack(float angle, float horizontalSpeed, float verti
     data << float(vsin);                                // y direction
     data << float(horizontalSpeed);                     // Horizontal speed
     data << float(-verticalSpeed);                      // Z Movement speed (vertical)
-    SendPacket(&data);
+    SendPacket(data);
 }
 
 void WorldSession::HandleMoveHoverAck(WorldPacket& recv_data)
@@ -521,11 +526,13 @@ bool WorldSession::VerifyMovementInfo(MovementInfo const& movementInfo) const
 
 void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo)
 {
-    movementInfo.UpdateTime(WorldTimer::getMSTime());
+    if (m_clientTimeDelay == 0)
+        m_clientTimeDelay = WorldTimer::getMSTime() - movementInfo.GetTime();
+    movementInfo.UpdateTime(movementInfo.GetTime() + m_clientTimeDelay + MOVEMENT_PACKET_TIME_DELAY);
 
     Unit* mover = _player->GetMover();
 
-    if (Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : NULL)
+    if (Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : nullptr)
     {
         if (movementInfo.HasMovementFlag(MOVEFLAG_ONTRANSPORT))
         {
@@ -546,7 +553,7 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo)
         else if (plMover->m_transport)               // if we were on a transport, leave
         {
             plMover->m_transport->RemovePassenger(plMover);
-            plMover->m_transport = NULL;
+            plMover->m_transport = nullptr;
             movementInfo.ClearTransportData();
         }
 

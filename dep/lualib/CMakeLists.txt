@@ -1,63 +1,19 @@
 #
-# This code is part of MaNGOS. Contributor & Copyright details are in AUTHORS/THANKS.
-#
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+# Copyright (C) 2010 - 2014 Eluna Lua Engine <http://emudevs.com/>
+# This program is free software licensed under GPL version 3
+# Please see the included DOCS/LICENSE.md for more information
 #
 
-set(LIBRARY_NAME lualib)
+file(GLOB sources *.c)
+list(REMOVE_ITEM sources ${CMAKE_CURRENT_SOURCE_DIR}/lua.c)
+list(REMOVE_ITEM sources ${CMAKE_CURRENT_SOURCE_DIR}/luac.c)
 
-set(LIBRARY_SRCS
-    lapi.c
-    lauxlib.c
-    lbaselib.c
-    lbitlib.c
-    lcode.c
-    lcorolib.c
-    lctype.c
-    ldblib.c
-    ldebug.c
-    ldo.c
-    ldump.c
-    lfunc.c
-    lgc.c
-    linit.c
-    liolib.c
-    llex.c
-    lmathlib.c
-    lmem.c
-    loadlib.c
-    lobject.c
-    lopcodes.c
-    loslib.c
-    lparser.c
-    lstate.c
-    lstring.c
-    lstrlib.c
-    ltable.c
-    ltablib.c
-    ltm.c
-    lua.c
-    lundump.c
-    lvm.c
-    lzio.c
+set(lua_STAT_SRCS
+  ${sources}
 )
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_library(${LIBRARY_NAME} STATIC
-  ${LIBRARY_SRCS}
-)
+add_library(lualib STATIC ${lua_STAT_SRCS})

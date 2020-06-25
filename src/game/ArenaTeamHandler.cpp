@@ -19,7 +19,6 @@
 #include "WorldSession.h"
 #include "WorldPacket.h"
 #include "Log.h"
-#include "Database/DatabaseEnv.h"
 #include "Player.h"
 #include "ObjectMgr.h"
 #include "ArenaTeam.h"
@@ -34,15 +33,22 @@ void WorldSession::HandleInspectArenaTeamsOpcode(WorldPacket& recv_data)
     recv_data >> guid;
     DEBUG_LOG("Inspect Arena stats %s", guid.GetString().c_str());
 
-    if (Player* plr = sObjectMgr.GetPlayer(guid))
+    Player* player = sObjectMgr.GetPlayer(guid);
+    if (!player)
+        return;
+
+    if (!_player->IsWithinDistInMap(player, INSPECT_DISTANCE, false))
+        return;
+
+    if (_player->IsHostileTo(player))
+        return;
+
+    for (uint8 i = 0; i < MAX_ARENA_SLOT; ++i)
     {
-        for (uint8 i = 0; i < MAX_ARENA_SLOT; ++i)
+        if (uint32 a_id = player->GetArenaTeamId(i))
         {
-            if (uint32 a_id = plr->GetArenaTeamId(i))
-            {
-                if (ArenaTeam* at = sObjectMgr.GetArenaTeamById(a_id))
-                    at->InspectStats(this, plr->GetObjectGuid());
-            }
+            if (ArenaTeam* arenaTeam = sObjectMgr.GetArenaTeamById(a_id))
+                arenaTeam->InspectStats(this, player->GetObjectGuid());
         }
     }
 }
@@ -79,7 +85,7 @@ void WorldSession::HandleArenaTeamInviteOpcode(WorldPacket& recv_data)
     uint32 ArenaTeamId;                                     // arena team id
     std::string Invitedname;
 
-    Player* player = NULL;
+    Player* player = nullptr;
 
     recv_data >> ArenaTeamId >> Invitedname;
 
@@ -145,12 +151,12 @@ void WorldSession::HandleArenaTeamInviteOpcode(WorldPacket& recv_data)
     WorldPacket data(SMSG_ARENA_TEAM_INVITE, (8 + 10));
     data << GetPlayer()->GetName();
     data << arenateam->GetName();
-    player->GetSession()->SendPacket(&data);
+    player->GetSession()->SendPacket(data);
 
     DEBUG_LOG("WORLD: Sent SMSG_ARENA_TEAM_INVITE");
 }
 
-void WorldSession::HandleArenaTeamAcceptOpcode(WorldPacket & /*recv_data*/)
+void WorldSession::HandleArenaTeamAcceptOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("CMSG_ARENA_TEAM_ACCEPT");                    // empty opcode
 
@@ -184,7 +190,7 @@ void WorldSession::HandleArenaTeamAcceptOpcode(WorldPacket & /*recv_data*/)
     at->BroadcastEvent(ERR_ARENA_TEAM_JOIN_SS, _player->GetObjectGuid(), _player->GetName(), at->GetName().c_str());
 }
 
-void WorldSession::HandleArenaTeamDeclineOpcode(WorldPacket & /*recv_data*/)
+void WorldSession::HandleArenaTeamDeclineOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("CMSG_ARENA_TEAM_DECLINE");                   // empty opcode
 
@@ -327,24 +333,24 @@ void WorldSession::HandleArenaTeamLeaderOpcode(WorldPacket& recv_data)
     at->BroadcastEvent(ERR_ARENA_TEAM_LEADER_CHANGED_SSS, _player->GetName(), name.c_str(), at->GetName().c_str());
 }
 
-void WorldSession::SendArenaTeamCommandResult(uint32 team_action, const std::string& team, const std::string& player, uint32 error_id)
+void WorldSession::SendArenaTeamCommandResult(uint32 team_action, const std::string& team, const std::string& player, uint32 error_id) const
 {
     WorldPacket data(SMSG_ARENA_TEAM_COMMAND_RESULT, 4 + team.length() + 1 + player.length() + 1 + 4);
     data << uint32(team_action);
     data << team;
     data << player;
     data << uint32(error_id);
-    SendPacket(&data);
+    SendPacket(data);
 }
 
-void WorldSession::SendNotInArenaTeamPacket(uint8 type)
+void WorldSession::SendNotInArenaTeamPacket(uint8 type) const
 {
     WorldPacket data(SMSG_ARENA_ERROR, 4 + 1);              // 886 - You are not in a %uv%u arena team
     uint32 unk = 0;
     data << uint32(unk);                                    // unk(0)
     if (!unk)
         data << uint8(type);                                // team type (2=2v2,3=3v3,5=5v5), can be used for custom types...
-    SendPacket(&data);
+    SendPacket(data);
 }
 
 /*

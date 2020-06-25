@@ -20,9 +20,10 @@
 #define _VMAPMANAGER2_H
 
 #include "IVMapManager.h"
-#include "Utilities/UnorderedMapSet.h"
-#include "Platform/Define.h"
+
 #include <G3D/Vector3.h>
+
+#include <unordered_map>
 
 //===========================================================
 
@@ -48,7 +49,7 @@ namespace VMAP
     class ManagedModel
     {
         public:
-            ManagedModel(): iModel(0), iRefCount(0) {}
+            ManagedModel() : iModel(nullptr), iRefCount(0) {}
             void setModel(WorldModel* model) { iModel = model; }
             WorldModel* getModel() { return iModel; }
             void incRefCount() { ++iRefCount; }
@@ -58,8 +59,8 @@ namespace VMAP
             int iRefCount;
     };
 
-    typedef UNORDERED_MAP<uint32 , StaticMapTree*> InstanceTreeMap;
-    typedef UNORDERED_MAP<std::string, ManagedModel> ModelFileMap;
+    typedef std::unordered_map<uint32 , StaticMapTree*> InstanceTreeMap;
+    typedef std::unordered_map<std::string, ManagedModel> ModelFileMap;
 
     class VMapManager2 : public IVMapManager
     {
@@ -91,7 +92,7 @@ namespace VMAP
             bool getObjectHitPos(unsigned int pMapId, float x1, float y1, float z1, float x2, float y2, float z2, float& rx, float& ry, float& rz, float pModifyDist) override;
             float getHeight(unsigned int pMapId, float x, float y, float z, float maxSearchDist) override;
 
-            bool processCommand(char* pCommand) override { return false; }      // for debug and extensions
+            bool processCommand(char* /*pCommand*/) override { return false; }      // for debug and extensions
 
             bool getAreaInfo(unsigned int pMapId, float x, float y, float& z, uint32& flags, int32& adtId, int32& rootId, int32& groupId) const override;
             bool GetLiquidLevel(uint32 pMapId, float x, float y, float z, uint8 ReqLiquidType, float& level, float& floor, uint32& type) const override;
@@ -100,7 +101,7 @@ namespace VMAP
             void releaseModelInstance(const std::string& filename);
 
             // what's the use of this? o.O
-            std::string getDirFileName(unsigned int pMapId, int x, int y) const override
+            std::string getDirFileName(unsigned int pMapId, int /*x*/, int /*y*/) const override
             {
                 return getMapFileName(pMapId);
             }

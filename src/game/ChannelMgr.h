@@ -20,10 +20,8 @@
 
 #include "Common.h"
 #include "Channel.h"
-#include "Policies/Singleton.h"
 
 #include <map>
-#include <string>
 
 class ChannelMgr
 {
@@ -32,12 +30,12 @@ class ChannelMgr
         ChannelMgr() {}
         ~ChannelMgr();
 
-        Channel* GetJoinChannel(std::string name, uint32 channel_id);
-        Channel* GetChannel(std::string name, Player* p, bool pkt = true);
-        void LeftChannel(std::string name);
+        Channel* GetJoinChannel(const std::string& name, uint32 channel_id);
+        Channel* GetChannel(const std::string& name, Player* p, bool pkt = true);
+        void LeftChannel(const std::string& name);
     private:
         ChannelMap channels;
-        void MakeNotOnPacket(WorldPacket* data, std::string name);
+        void MakeNotOnPacket(WorldPacket& data, const std::string& name) const;
 };
 
 class AllianceChannelMgr : public ChannelMgr {};

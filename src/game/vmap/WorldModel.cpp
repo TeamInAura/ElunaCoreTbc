@@ -19,6 +19,7 @@
 #include "WorldModel.h"
 #include "VMapDefinitions.h"
 #include "MapTree.h"
+#include <string.h>
 
 using G3D::Vector3;
 using G3D::Ray;
@@ -106,11 +107,11 @@ namespace VMAP
     WmoLiquid::WmoLiquid(uint32 width, uint32 height, const Vector3& corner, uint32 type):
         iTilesX(width), iTilesY(height), iCorner(corner), iType(type)
     {
-        iHeight = new float[(width+1)*(height+1)];
-        iFlags = new uint8[width*height];
+        iHeight = new float[(width + 1) * (height + 1)];
+        iFlags = new uint8[width * height];
     }
 
-    WmoLiquid::WmoLiquid(const WmoLiquid& other): iHeight(NULL), iFlags(NULL)
+    WmoLiquid::WmoLiquid(const WmoLiquid& other): iHeight(nullptr), iFlags(nullptr)
     {
         *this = other;                                      // use assignment operator defined below
     }
@@ -139,14 +140,14 @@ namespace VMAP
             memcpy(iHeight, other.iHeight, (iTilesX + 1) * (iTilesY + 1) * sizeof(float));
         }
         else
-            iHeight = NULL;
+            iHeight = nullptr;
         if (other.iFlags)
         {
             iFlags = new uint8[iTilesX * iTilesY];
             memcpy(iFlags, other.iFlags, iTilesX * iTilesY * sizeof(uint8));
         }
         else
-            iFlags = NULL;
+            iFlags = nullptr;
 
         return *this;
     }
@@ -164,7 +165,7 @@ namespace VMAP
 
         // check if tile shall be used for liquid level
         // checking for 0x08 *might* be enough, but disabled tiles always are 0x?F:
-        if ((iFlags[tx + ty*iTilesX] & 0x0F) == 0x0F)
+        if ((iFlags[tx + ty * iTilesX] & 0x0F) == 0x0F)
             return false;
 
         // (dx, dy) coordinates inside tile, in [0,1]^2
@@ -186,14 +187,14 @@ namespace VMAP
         const uint32 rowOffset = iTilesX + 1;
         if (dx > dy) // case (a)
         {
-            float sx = iHeight[tx+1 +  ty    * rowOffset] - iHeight[tx   + ty * rowOffset];
-            float sy = iHeight[tx+1 + (ty+1) * rowOffset] - iHeight[tx+1 + ty * rowOffset];
+            float sx = iHeight[tx + 1 +  ty    * rowOffset] - iHeight[tx   + ty * rowOffset];
+            float sy = iHeight[tx + 1 + (ty + 1) * rowOffset] - iHeight[tx + 1 + ty * rowOffset];
             liqHeight = iHeight[tx + ty * rowOffset] + dx * sx + dy * sy;
         }
         else // case (b)
         {
-            float sx = iHeight[tx+1 + (ty+1) * rowOffset] - iHeight[tx + (ty+1) * rowOffset];
-            float sy = iHeight[tx   + (ty+1) * rowOffset] - iHeight[tx +  ty    * rowOffset];
+            float sx = iHeight[tx + 1 + (ty + 1) * rowOffset] - iHeight[tx + (ty + 1) * rowOffset];
+            float sy = iHeight[tx   + (ty + 1) * rowOffset] - iHeight[tx +  ty    * rowOffset];
             liqHeight = iHeight[tx + ty * rowOffset] + dx * sx + dy * sy;
         }
         return true;
@@ -245,7 +246,7 @@ namespace VMAP
 
     GroupModel::GroupModel(const GroupModel& other):
         iBound(other.iBound), iMogpFlags(other.iMogpFlags), iGroupWMOID(other.iGroupWMOID),
-        vertices(other.vertices), triangles(other.triangles), meshTree(other.meshTree), iLiquid(0)
+        vertices(other.vertices), triangles(other.triangles), meshTree(other.meshTree), iLiquid(nullptr)
     {
         if (other.iLiquid)
             iLiquid = new WmoLiquid(*other.iLiquid);
@@ -309,7 +310,7 @@ namespace VMAP
         triangles.clear();
         vertices.clear();
         delete iLiquid;
-        iLiquid = 0;
+        iLiquid = nullptr;
 
         if (result && fread(&iBound, sizeof(G3D::AABox), 1, rf) != 1) result = false;
         if (result && fread(&iMogpFlags, sizeof(uint32), 1, rf) != 1) result = false;

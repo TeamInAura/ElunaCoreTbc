@@ -256,7 +256,7 @@ class BattleGroundEY : public BattleGround
         void RemovePlayer(Player* plr, ObjectGuid guid) override;
         bool HandleEvent(uint32 eventId, GameObject* go) override;
         void HandleGameObjectCreate(GameObject* go) override;
-        void HandleAreaTrigger(Player* source, uint32 trigger) override;
+        bool HandleAreaTrigger(Player* source, uint32 trigger) override;
         void HandleKillPlayer(Player* player, Player* killer) override;
 
         virtual WorldSafeLocsEntry const* GetClosestGraveYard(Player* player) override;
@@ -272,6 +272,8 @@ class BattleGroundEY : public BattleGround
         /* Battleground Events */
         virtual void EventPlayerClickedOnFlag(Player* source, GameObject* target_obj) override;
         virtual void EventPlayerDroppedFlag(Player* source) override;
+
+        virtual Team GetPrematureWinner() override;
 
     private:
         // process capture events
@@ -295,7 +297,7 @@ class BattleGroundEY : public BattleGround
         ObjectGuid m_towers[EY_NODES_MAX];
 
         uint32 m_honorTicks;
-        uint32 m_honorScoreTicks[BG_TEAMS_COUNT];
+        uint32 m_honorScoreTicks[PVP_TEAM_COUNT];
 
         uint32 m_flagRespawnTimer;
         uint32 m_resourceUpdateTimer;

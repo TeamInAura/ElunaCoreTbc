@@ -96,9 +96,9 @@ class PathFinder
 
         dtQueryFilter m_filter;                     // use single filter for all movements, update it when needed
 
-        void setStartPosition(Vector3 point) { m_startPosition = point; }
-        void setEndPosition(Vector3 point) { m_actualEndPosition = point; m_endPosition = point; }
-        void setActualEndPosition(Vector3 point) { m_actualEndPosition = point; }
+        void setStartPosition(const Vector3& point) { m_startPosition = point; }
+        void setEndPosition(const Vector3& point) { m_actualEndPosition = point; m_endPosition = point; }
+        void setActualEndPosition(const Vector3& point) { m_actualEndPosition = point; }
 
         void clear()
         {
@@ -110,7 +110,7 @@ class PathFinder
         float dist3DSqr(const Vector3& p1, const Vector3& p2) const;
         bool inRangeYZX(const float* v1, const float* v2, float r, float h) const;
 
-        dtPolyRef getPathPolyByPosition(const dtPolyRef* polyPath, uint32 polyPathSize, const float* point, float* distance = NULL) const;
+        dtPolyRef getPathPolyByPosition(const dtPolyRef* polyPath, uint32 polyPathSize, const float* point, float* distance = nullptr) const;
         dtPolyRef getPolyByLocation(const float* point, float* distance) const;
         bool HaveTile(const Vector3& p) const;
 
@@ -118,7 +118,7 @@ class PathFinder
         void BuildPointPath(const float* startPoint, const float* endPoint);
         void BuildShortcut();
 
-        NavTerrain getNavTerrain(float x, float y, float z);
+        NavTerrain getNavTerrain(float x, float y, float z) const;
         void createFilter();
         void updateFilter();
 
@@ -127,7 +127,7 @@ class PathFinder
                              const dtPolyRef* visited, uint32 nvisited);
         bool getSteerTarget(const float* startPos, const float* endPos, float minTargetDist,
                             const dtPolyRef* path, uint32 pathSize, float* steerPos,
-                            unsigned char& steerPosFlag, dtPolyRef& steerPosRef);
+                            unsigned char& steerPosFlag, dtPolyRef& steerPosRef) const;
         dtStatus findSmoothPath(const float* startPos, const float* endPos,
                                 const dtPolyRef* polyPath, uint32 polyPathSize,
                                 float* smoothPath, int* smoothPathSize, uint32 smoothPathMaxSize);

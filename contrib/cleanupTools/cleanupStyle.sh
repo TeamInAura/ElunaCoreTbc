@@ -6,38 +6,30 @@
 # Use at own Risk:
 # OVERRIDE_CORRECTNESS[2]   <- Appends override correctness (add 2 for second pass)
 
-# Do config stuff
-sh "${0%/*}/cleanupToolConfig.sh"
-if [ "$?" != "0" ]
-then
-  echo "You need to edit the configuration file before you can use this tool!"
-  echo "Configuration file: ${0%/*}/cleanupTools.config"
-  exit 0
-fi
-
-# And use config settings
-. "${0%/*}/cleanupTools.config"
+# Use config settings
+. "${0%/*}/cleanupStyleConfig.sh"
 
 
 ## Internal Stuff
 
 # Mangos Cleanup options for AStyle
-OPTIONS="--convert-tabs --align-pointer=type --suffix=none \
-          --keep-one-line-blocks --keep-one-line-statements \
-          --indent-classes --indent-switches --indent-namespaces \
-          --pad-header --unpad-paren --pad-oper --style=allman"
+OPTIONS="\
+--convert-tabs --align-pointer=type --suffix=none \
+--keep-one-line-blocks --keep-one-line-statements \
+--indent-classes --indent-switches --indent-namespaces \
+--pad-header --unpad-paren --pad-oper --style=allman"
 
 if [ "$DO_ON" = "MANGOS_SRC" ]
 then
   FILEPATH=$BASEPATH/src
-  OPTIONS="$OPTIONS --exclude=ScriptDev2"
+  OPTIONS="$OPTIONS --exclude=ScriptDev2 --ignore-exclude-errors"
 elif [ "$DO_ON" = "MANGOS_CONTRIB" ]
 then
   FILEPATH=$BASEPATH/contrib
 elif [ "$DO_ON" = "MANGOS_WHOLE" ]
 then
   FILEPATH=$BASEPATH
-  OPTIONS="$OPTIONS --exclude=ScriptDev2"
+  OPTIONS="$OPTIONS --exclude=ScriptDev2 --ignore-exclude-errors"
 elif [ "$DO_ON" = "SD2" ]
 then
   FILEPATH=$BASEPATH/src/bindings/ScriptDev2

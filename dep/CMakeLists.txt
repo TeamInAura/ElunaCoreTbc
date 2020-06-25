@@ -16,14 +16,12 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 #
 
-if(NOT (TBB_USE_EXTERNAL OR USE_STD_MALLOC))
-  add_subdirectory(tbb)
-endif()
-
-if(NOT ACE_USE_EXTERNAL)
-  add_subdirectory(ACE_wrappers)
-endif()
+# disable warnings for dependencies
+add_compile_options(-w)
 
 add_subdirectory(lualib)
 add_subdirectory(recastnavigation)
 add_subdirectory(src)
+if (BUILD_VMAP_EXTRACTOR)
+  add_subdirectory(libmpq)
+endif()

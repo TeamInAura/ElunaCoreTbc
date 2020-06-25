@@ -28,11 +28,12 @@
 #include "movement/MoveSpline.h"
 #include "movement/MoveSplineInit.h"
 #include "Map.h"
-#include "CreatureAISelector.h"
+#include "AI/CreatureAISelector.h"
 #include "Creature.h"
 #include "CreatureLinkingMgr.h"
 #include "Pet.h"
 #include "DBCStores.h"
+#include "Log.h"
 
 #include <cassert>
 
@@ -53,8 +54,10 @@ void MotionMaster::Initialize()
     if (m_owner->GetTypeId() == TYPEID_UNIT && !m_owner->hasUnitState(UNIT_STAT_CONTROLLED))
     {
         MovementGenerator* movement = FactorySelector::selectMovementGenerator((Creature*)m_owner);
-        push(movement == NULL ? &si_idleMovement : movement);
+        push(movement == nullptr ? &si_idleMovement : movement);
         top()->Initialize(*m_owner);
+        if (top()->GetMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+            (static_cast<WaypointMovementGenerator<Creature>*>(top()))->InitializeWaypointPath(*((Creature*)(m_owner)), 0, PATH_NO_PATH, 0, 0);
     }
     else
         push(&si_idleMovement);
@@ -98,7 +101,7 @@ void MotionMaster::UpdateMotion(uint32 diff)
         }
 
         delete m_expList;
-        m_expList = NULL;
+        m_expList = nullptr;
 
         if (empty())
             Initialize();
@@ -172,7 +175,7 @@ void MotionMaster::DirectExpire(bool reset)
     }
 
     // Store current top MMGen, as Finalize might push a new MMGen
-    MovementGenerator* nowTop = empty() ? NULL : top();
+    MovementGenerator* nowTop = empty() ? nullptr : top();
     // it can add another motions instead
     curr->Finalize(*m_owner);
 
@@ -370,20 +373,22 @@ void MotionMaster::MoveFleeing(Unit* enemy, uint32 time)
     }
 }
 
-void MotionMaster::MoveWaypoint()
+void MotionMaster::MoveWaypoint(int32 id /*=0*/, uint32 source /*=0==PATH_NO_PATH*/, uint32 initialDelay /*=0*/, uint32 overwriteEntry /*=0*/)
 {
     if (m_owner->GetTypeId() == TYPEID_UNIT)
     {
         if (GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
         {
-            sLog.outError("Creature %s (Entry %u) attempt to MoveWaypoint() but creature is already using waypoint", m_owner->GetGuidStr().c_str(), m_owner->GetEntry());
+            sLog.outError("%s attempt to MoveWaypoint() but is already using waypoint", m_owner->GetGuidStr().c_str());
             return;
         }
 
         Creature* creature = (Creature*)m_owner;
 
-        DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "Creature %s (Entry %u) start MoveWaypoint()", m_owner->GetGuidStr().c_str(), m_owner->GetEntry());
-        Mutate(new WaypointMovementGenerator<Creature>(*creature));
+        DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "%s start MoveWaypoint()", m_owner->GetGuidStr().c_str());
+        WaypointMovementGenerator<Creature>* newWPMMgen = new WaypointMovementGenerator<Creature>(*creature);
+        Mutate(newWPMMgen);
+        newWPMMgen->InitializeWaypointPath(*creature, id, (WaypointPathOrigin)source, initialDelay, overwriteEntry);
     }
     else
     {
@@ -436,9 +441,9 @@ void MotionMaster::Mutate(MovementGenerator* m)
     {
         switch (top()->GetMovementGeneratorType())
         {
-                // HomeMovement is not that important, delete it if meanwhile a new comes
+            // HomeMovement is not that important, delete it if meanwhile a new comes
             case HOME_MOTION_TYPE:
-                // DistractMovement interrupted by any other movement
+            // DistractMovement interrupted by any other movement
             case DISTRACT_MOTION_TYPE:
                 MovementExpired(false);
             default:
@@ -462,6 +467,16 @@ void MotionMaster::propagateSpeedChange()
     }
 }
 
+bool MotionMaster::SetNextWaypoint(uint32 pointId)
+{
+    for (Impl::container_type::reverse_iterator rItr = Impl::c.rbegin(); rItr != Impl::c.rend(); ++rItr)
+    {
+        if ((*rItr)->GetMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+            return (static_cast<WaypointMovementGenerator<Creature>*>(*rItr))->SetNextWaypoint(pointId);
+    }
+    return false;
+}
+
 uint32 MotionMaster::getLastReachedWaypoint() const
 {
     for (Impl::container_type::const_reverse_iterator rItr = Impl::c.rbegin(); rItr != Impl::c.rend(); ++rItr)
@@ -480,7 +495,19 @@ MovementGeneratorType MotionMaster::GetCurrentMovementGeneratorType() const
     return top()->GetMovementGeneratorType();
 }
 
-bool MotionMaster::GetDestination(float& x, float& y, float& z)
+void MotionMaster::GetWaypointPathInformation(std::ostringstream& oss) const
+{
+    for (Impl::container_type::const_reverse_iterator rItr = Impl::c.rbegin(); rItr != Impl::c.rend(); ++rItr)
+    {
+        if ((*rItr)->GetMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+        {
+            static_cast<WaypointMovementGenerator<Creature>*>(*rItr)->GetPathInformation(oss);
+            return;
+        }
+    }
+}
+
+bool MotionMaster::GetDestination(float& x, float& y, float& z) const
 {
     if (m_owner->movespline->Finalized())
         return false;

@@ -17,7 +17,6 @@
  */
 
 #include "Common.h"
-#include "Database/DatabaseEnv.h"
 #include "DBCStores.h"
 #include "WorldPacket.h"
 #include "Player.h"
@@ -58,7 +57,7 @@ bool ChatHandler::HandleDebugSendSpellFailCommand(char* args)
     if (failarg2)
         data << uint32(failarg2);
 
-    m_session->SendPacket(&data);
+    m_session->SendPacket(data);
 
     return true;
 }
@@ -92,7 +91,7 @@ bool ChatHandler::HandleDebugSendEquipErrorCommand(char* args)
         return false;
 
     uint8 msg = atoi(args);
-    m_session->GetPlayer()->SendEquipError(InventoryResult(msg), NULL, NULL);
+    m_session->GetPlayer()->SendEquipError(InventoryResult(msg), nullptr, nullptr);
     return true;
 }
 
@@ -102,7 +101,7 @@ bool ChatHandler::HandleDebugSendSellErrorCommand(char* args)
         return false;
 
     uint8 msg = atoi(args);
-    m_session->GetPlayer()->SendSellError(SellResult(msg), 0, ObjectGuid(), 0);
+    m_session->GetPlayer()->SendSellError(SellResult(msg), nullptr, ObjectGuid(), 0);
     return true;
 }
 
@@ -112,7 +111,7 @@ bool ChatHandler::HandleDebugSendBuyErrorCommand(char* args)
         return false;
 
     uint8 msg = atoi(args);
-    m_session->GetPlayer()->SendBuyError(BuyResult(msg), 0, 0, 0);
+    m_session->GetPlayer()->SendBuyError(BuyResult(msg), nullptr, 0, 0);
     return true;
 }
 
@@ -127,7 +126,7 @@ bool ChatHandler::HandleDebugSendOpcodeCommand(char* /*args*/)
         return false;
 
     uint32 opcode = 0;
-    if (!stream >> opcode)
+    if (!(stream >> opcode))
     {
         stream.close();
         return false;
@@ -138,7 +137,7 @@ bool ChatHandler::HandleDebugSendOpcodeCommand(char* /*args*/)
     std::string type;
     while (stream >> type)
     {
-        if (type == "")
+        if (type.empty())
             break;
 
         if (type == "uint8")
@@ -192,7 +191,7 @@ bool ChatHandler::HandleDebugSendOpcodeCommand(char* /*args*/)
     DEBUG_LOG("Sending opcode %u, %s", data.GetOpcode(), data.GetOpcodeName());
 
     data.hexlike();
-    ((Player*)unit)->GetSession()->SendPacket(&data);
+    ((Player*)unit)->GetSession()->SendPacket(data);
 
     PSendSysMessage(LANG_COMMAND_OPCODESENT, data.GetOpcode(), unit->GetName());
 
@@ -279,7 +278,7 @@ bool ChatHandler::HandleDebugSendChannelNotifyCommand(char* args)
     data << name;                                           // channel name
     data << uint32(0);
     data << uint32(0);
-    m_session->SendPacket(&data);
+    m_session->SendPacket(data);
     return true;
 }
 
@@ -293,8 +292,8 @@ bool ChatHandler::HandleDebugSendChatMsgCommand(char* args)
         return false;
 
     WorldPacket data;
-    ChatHandler::BuildChatPacket(data, ChatMsg(type), msg, LANG_UNIVERSAL, CHAT_TAG_NONE, m_session->GetPlayer()->GetObjectGuid(), m_session->GetPlayerName());
-    m_session->SendPacket(&data);
+    BuildChatPacket(data, ChatMsg(type), msg, LANG_UNIVERSAL, CHAT_TAG_NONE, m_session->GetPlayer()->GetObjectGuid(), m_session->GetPlayerName());
+    m_session->SendPacket(data);
     return true;
 }
 
@@ -329,7 +328,7 @@ bool ChatHandler::HandleDebugGetLootRecipientCommand(char* /*args*/)
 
 bool ChatHandler::HandleDebugSendQuestInvalidMsgCommand(char* args)
 {
-    uint32 msg = atol(args);
+    uint32 msg = std::stoul(args);
     m_session->GetPlayer()->SendCanTakeQuestResponse(msg);
     return true;
 }
@@ -408,7 +407,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
 
     if (list_queue)
     {
-        std::vector<Item*> &updateQueue = player->GetItemUpdateQueue();
+        std::vector<Item*>& updateQueue = player->GetItemUpdateQueue();
         for (size_t i = 0; i < updateQueue.size(); ++i)
         {
             Item* item = updateQueue[i];
@@ -436,7 +435,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
     if (check_all)
     {
         bool error = false;
-        std::vector<Item*> &updateQueue = player->GetItemUpdateQueue();
+        std::vector<Item*>& updateQueue = player->GetItemUpdateQueue();
         for (uint8 i = PLAYER_SLOT_START; i < PLAYER_SLOT_END; ++i)
         {
             if (i >= BUYBACK_SLOT_START && i < BUYBACK_SLOT_END)
@@ -478,7 +477,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
                     error = true; continue;
                 }
 
-                if (updateQueue[qp] == NULL)
+                if (updateQueue[qp] == nullptr)
                 {
                     PSendSysMessage("%s at slot %u has a queuepos (%d) that points to NULL in the queue!",
                                     item->GetGuidStr().c_str(), item->GetSlot(), qp);
@@ -549,7 +548,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
                             error = true; continue;
                         }
 
-                        if (updateQueue[qp] == NULL)
+                        if (updateQueue[qp] == nullptr)
                         {
                             PSendSysMessage("%s in bag %u at slot %u has a queuepos (%d) that points to NULL in the queue!",
                                             item2->GetGuidStr().c_str(), bag->GetSlot(), item2->GetSlot(), qp);
@@ -597,7 +596,7 @@ bool ChatHandler::HandleDebugGetItemStateCommand(char* args)
             if (item->GetState() == ITEM_REMOVED) continue;
             Item* test = player->GetItemByPos(item->GetBagSlot(), item->GetSlot());
 
-            if (test == NULL)
+            if (test == nullptr)
             {
                 PSendSysMessage("queue(" SIZEFMTD "): %s has incorrect (bag %u slot %u) values, the player doesn't have an item at that position!",
                                 i, item->GetGuidStr().c_str(), item->GetBagSlot(), item->GetSlot());
@@ -910,29 +909,30 @@ bool ChatHandler::HandlerDebugModValueHelper(Object* target, uint32 field, char*
             return false;
 
         uint32 value = target->GetUInt32Value(field);
+        const char* guidString = guid.GetString().c_str();
 
         switch (type)
         {
             default:
             case 1:                                         // int +
                 value = uint32(int32(value) + int32(iValue));
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_INT32), guid.GetString().c_str(), field, iValue, value, value);
-                PSendSysMessage(LANG_CHANGE_INT32_FIELD, guid.GetString().c_str(), field, iValue, value, value);
+                DEBUG_LOG(GetMangosString(LANG_CHANGE_INT32), guidString, field, iValue, value, value);
+                PSendSysMessage(LANG_CHANGE_INT32_FIELD, guidString, field, iValue, value, value);
                 break;
             case 2:                                         // |= bit or
                 value |= iValue;
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guid.GetString().c_str(), field, typeStr, iValue, value);
-                PSendSysMessage(LANG_CHANGE_HEX_FIELD, guid.GetString().c_str(), field, typeStr, iValue, value);
+                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guidString, field, typeStr, iValue, value);
+                PSendSysMessage(LANG_CHANGE_HEX_FIELD, guidString, field, typeStr, iValue, value);
                 break;
             case 3:                                         // &= bit and
                 value &= iValue;
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guid.GetString().c_str(), field, typeStr, iValue, value);
-                PSendSysMessage(LANG_CHANGE_HEX_FIELD, guid.GetString().c_str(), field, typeStr, iValue, value);
+                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guidString, field, typeStr, iValue, value);
+                PSendSysMessage(LANG_CHANGE_HEX_FIELD, guidString, field, typeStr, iValue, value);
                 break;
             case 4:                                         // &=~ bit and not
                 value &= ~iValue;
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guid.GetString().c_str(), field, typeStr, iValue, value);
-                PSendSysMessage(LANG_CHANGE_HEX_FIELD, guid.GetString().c_str(), field, typeStr, iValue, value);
+                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guidString, field, typeStr, iValue, value);
+                PSendSysMessage(LANG_CHANGE_HEX_FIELD, guidString, field, typeStr, iValue, value);
                 break;
         }
 
@@ -1013,7 +1013,7 @@ bool ChatHandler::HandleDebugSpellCoefsCommand(char* args)
     if (!spellid)
         return false;
 
-    SpellEntry const* spellEntry = sSpellStore.LookupEntry(spellid);
+    SpellEntry const* spellEntry = sSpellTemplate.LookupEntry<SpellEntry>(spellid);
     if (!spellEntry)
         return false;
 
@@ -1085,7 +1085,7 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
         return false;
 
     Player* chr = getSelectedPlayer();
-    if (chr == NULL)
+    if (chr == nullptr)
     {
         SendSysMessage(LANG_NO_CHAR_SELECTED);
         SetSentErrorMessage(true);
@@ -1106,7 +1106,7 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
     data << uint8(effidx);
     data << uint8(spellmodop);
     data << int32(value);
-    chr->GetSession()->SendPacket(&data);
+    chr->GetSession()->SendPacket(data);
 
     return true;
 }

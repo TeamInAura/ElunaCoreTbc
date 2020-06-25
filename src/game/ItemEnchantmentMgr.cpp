@@ -16,16 +16,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <stdlib.h>
-#include <functional>
 #include "ItemEnchantmentMgr.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "ProgressBar.h"
+#include "Util.h"
+
 #include <list>
 #include <vector>
-#include "Util.h"
 
 struct EnchStoreItem
 {
@@ -40,7 +39,7 @@ struct EnchStoreItem
 };
 
 typedef std::vector<EnchStoreItem> EnchStoreList;
-typedef UNORDERED_MAP<uint32, EnchStoreList> EnchantmentStore;
+typedef std::unordered_map<uint32, EnchStoreList> EnchantmentStore;
 
 static EnchantmentStore RandomItemEnch;
 
@@ -73,14 +72,12 @@ void LoadRandomEnchantmentsTable()
 
         delete result;
 
-        sLog.outString();
         sLog.outString(">> Loaded %u Item Enchantment definitions", count);
     }
     else
-    {
-        sLog.outString();
         sLog.outErrorDb(">> Loaded 0 Item Enchantment definitions. DB table `item_enchantment_template` is empty.");
-    }
+
+    sLog.outString();
 }
 
 uint32 GetItemEnchantMod(uint32 entry)
@@ -98,7 +95,8 @@ uint32 GetItemEnchantMod(uint32 entry)
     double dRoll = rand_chance();
     float fCount = 0;
 
-    for (EnchStoreList::const_iterator ench_iter = tab->second.begin(); ench_iter != tab->second.end(); ++ench_iter)
+    const EnchStoreList& enchantList = tab->second;
+    for (EnchStoreList::const_iterator ench_iter = enchantList.begin(); ench_iter != enchantList.end(); ++ench_iter)
     {
         fCount += ench_iter->chance;
 
@@ -109,7 +107,7 @@ uint32 GetItemEnchantMod(uint32 entry)
     dRoll = (irand(0, (int)floor(fCount * 100) + 1)) / 100;
     fCount = 0;
 
-    for (EnchStoreList::const_iterator ench_iter = tab->second.begin(); ench_iter != tab->second.end(); ++ench_iter)
+    for (EnchStoreList::const_iterator ench_iter = enchantList.begin(); ench_iter != enchantList.end(); ++ench_iter)
     {
         fCount += ench_iter->chance;
 
@@ -135,7 +133,7 @@ uint32 GenerateEnchSuffixFactor(uint32 item_id)
     uint32 suffixFactor;
     switch (itemProto->InventoryType)
     {
-            // Items of that type don`t have points
+        // Items of that type don`t have points
         case INVTYPE_NON_EQUIP:
         case INVTYPE_BAG:
         case INVTYPE_TABARD:
@@ -143,7 +141,7 @@ uint32 GenerateEnchSuffixFactor(uint32 item_id)
         case INVTYPE_QUIVER:
         case INVTYPE_RELIC:
             return 0;
-            // Select point coefficient
+        // Select point coefficient
         case INVTYPE_HEAD:
         case INVTYPE_BODY:
         case INVTYPE_CHEST:

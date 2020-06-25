@@ -21,39 +21,44 @@
 
 #include "Map.h"
 
-class MANGOS_DLL_DECL GridState
+class GridState
 {
     public:
 
         virtual void Update(Map&, NGridType&, GridInfo&, const uint32& x, const uint32& y, const uint32& t_diff) const = 0;
+        virtual ~GridState() {}
 };
 
-class MANGOS_DLL_DECL InvalidState : public GridState
+class InvalidState : public GridState
 {
     public:
 
         void Update(Map&, NGridType&, GridInfo&, const uint32& x, const uint32& y, const uint32& t_diff) const override;
+        virtual ~InvalidState() {}
 };
 
-class MANGOS_DLL_DECL ActiveState : public GridState
+class ActiveState : public GridState
 {
     public:
 
         void Update(Map&, NGridType&, GridInfo&, const uint32& x, const uint32& y, const uint32& t_diff) const override;
+        virtual ~ActiveState() {}
 };
 
-class MANGOS_DLL_DECL IdleState : public GridState
+class IdleState : public GridState
 {
     public:
 
         void Update(Map&, NGridType&, GridInfo&, const uint32& x, const uint32& y, const uint32& t_diff) const override;
+        virtual ~IdleState() {}
 };
 
-class MANGOS_DLL_DECL RemovalState : public GridState
+class RemovalState : public GridState
 {
     public:
 
         void Update(Map&, NGridType&, GridInfo&, const uint32& x, const uint32& y, const uint32& t_diff) const override;
+        virtual ~RemovalState() {}
 };
 
 #endif

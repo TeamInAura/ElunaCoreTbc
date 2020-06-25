@@ -20,21 +20,21 @@
 #define __BATTLEGROUNDMGR_H
 
 #include "Common.h"
-#include "Policies/Singleton.h"
 #include "Utilities/EventProcessor.h"
 #include "SharedDefines.h"
 #include "DBCEnums.h"
 #include "BattleGround.h"
-#include "ace/Recursive_Thread_Mutex.h"
+
+#include <mutex>
 
 typedef std::map<uint32, BattleGround*> BattleGroundSet;
 
 // this container can't be deque, because deque doesn't like removing the last element - if you remove it, it invalidates next iterator and crash appears
 typedef std::list<BattleGround*> BGFreeSlotQueueType;
 
-typedef UNORDERED_MAP<uint32, BattleGroundTypeId> BattleMastersMap;
-typedef UNORDERED_MAP<uint32, BattleGroundEventIdx> CreatureBattleEventIndexesMap;
-typedef UNORDERED_MAP<uint32, BattleGroundEventIdx> GameObjectBattleEventIndexesMap;
+typedef std::unordered_map<uint32, BattleGroundTypeId> BattleMastersMap;
+typedef std::unordered_map<uint32, BattleGroundEventIdx> CreatureBattleEventIndexesMap;
+typedef std::unordered_map<uint32, BattleGroundEventIdx> GameObjectBattleEventIndexesMap;
 
 #define BATTLEGROUND_ARENA_POINT_DISTRIBUTION_DAY 86400     // seconds in a day
 #define COUNT_OF_PLAYERS_TO_AVERAGE_WAIT_TIME 10
@@ -94,7 +94,7 @@ class BattleGroundQueue
 
     private:
         // mutex that should not allow changing private data, nor allowing to update Queue during private data change.
-        ACE_Recursive_Thread_Mutex  m_Lock;
+        std::recursive_mutex m_Lock;
 
 
         typedef std::map<ObjectGuid, PlayerQueueInfo> QueuedPlayersMap;
@@ -118,23 +118,23 @@ class BattleGroundQueue
         class SelectionPool
         {
             public:
+                SelectionPool() : PlayerCount(0) {}
                 void Init();
                 bool AddGroup(GroupQueueInfo* ginfo, uint32 desiredCount);
                 bool KickGroup(uint32 size);
                 uint32 GetPlayerCount() const {return PlayerCount;}
-            public:
                 GroupsQueueType SelectedGroups;
             private:
                 uint32 PlayerCount;
         };
 
         // one selection pool for horde, other one for alliance
-        SelectionPool m_SelectionPools[BG_TEAMS_COUNT];
+        SelectionPool m_SelectionPools[PVP_TEAM_COUNT];
 
         bool InviteGroupToBG(GroupQueueInfo* ginfo, BattleGround* bg, Team side);
-        uint32 m_WaitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS][COUNT_OF_PLAYERS_TO_AVERAGE_WAIT_TIME];
-        uint32 m_WaitTimeLastPlayer[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];
-        uint32 m_SumOfWaitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];
+        uint32 m_WaitTimes[PVP_TEAM_COUNT][MAX_BATTLEGROUND_BRACKETS][COUNT_OF_PLAYERS_TO_AVERAGE_WAIT_TIME];
+        uint32 m_WaitTimeLastPlayer[PVP_TEAM_COUNT][MAX_BATTLEGROUND_BRACKETS];
+        uint32 m_SumOfWaitTimes[PVP_TEAM_COUNT][MAX_BATTLEGROUND_BRACKETS];
 };
 
 /*
@@ -193,14 +193,14 @@ class BattleGroundMgr
         void Update(uint32 diff);
 
         /* Packet Building */
-        void BuildPlayerJoinedBattleGroundPacket(WorldPacket* data, Player* plr);
-        void BuildPlayerLeftBattleGroundPacket(WorldPacket* data, ObjectGuid guid);
-        void BuildBattleGroundListPacket(WorldPacket* data, ObjectGuid guid, Player* plr, BattleGroundTypeId bgTypeId);
-        void BuildGroupJoinedBattlegroundPacket(WorldPacket* data, BattleGroundTypeId bgTypeId);
-        void BuildUpdateWorldStatePacket(WorldPacket* data, uint32 field, uint32 value);
-        void BuildPvpLogDataPacket(WorldPacket* data, BattleGround* bg);
-        void BuildBattleGroundStatusPacket(WorldPacket* data, BattleGround* bg, uint8 QueueSlot, uint8 StatusID, uint32 Time1, uint32 Time2, ArenaType arenatype, Team arenaTeam);
-        void BuildPlaySoundPacket(WorldPacket* data, uint32 soundid);
+        void BuildPlayerJoinedBattleGroundPacket(WorldPacket& data, Player* plr) const;
+        void BuildPlayerLeftBattleGroundPacket(WorldPacket& data, ObjectGuid guid) const;
+        void BuildBattleGroundListPacket(WorldPacket& data, ObjectGuid guid, Player* plr, BattleGroundTypeId bgTypeId) const;
+        void BuildGroupJoinedBattlegroundPacket(WorldPacket& data, BattleGroundTypeId bgTypeId) const;
+        void BuildUpdateWorldStatePacket(WorldPacket& data, uint32 field, uint32 value) const;
+        void BuildPvpLogDataPacket(WorldPacket& data, BattleGround* bg) const;
+        void BuildBattleGroundStatusPacket(WorldPacket &data, BattleGround* bg, uint8 QueueSlot, uint8 StatusID, uint32 Time1, uint32 Time2, ArenaType arenatype, Team arenaTeam) const;
+        void BuildPlaySoundPacket(WorldPacket &data, uint32 soundid) const;
 
         /* Battlegrounds */
         BattleGround* GetBattleGroundThroughClientInstance(uint32 instanceId, BattleGroundTypeId bgTypeId);
@@ -209,7 +209,7 @@ class BattleGroundMgr
         BattleGround* GetBattleGroundTemplate(BattleGroundTypeId bgTypeId);
         BattleGround* CreateNewBattleGround(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracket_id, ArenaType arenaType, bool isRated);
 
-        uint32 CreateBattleGround(BattleGroundTypeId bgTypeId, bool IsArena, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam, uint32 LevelMin, uint32 LevelMax, char const* BattleGroundName, uint32 MapID, float Team1StartLocX, float Team1StartLocY, float Team1StartLocZ, float Team1StartLocO, float Team2StartLocX, float Team2StartLocY, float Team2StartLocZ, float Team2StartLocO);
+        uint32 CreateBattleGround(BattleGroundTypeId bgTypeId, bool IsArena, uint32 MinPlayersPerTeam, uint32 MaxPlayersPerTeam, uint32 LevelMin, uint32 LevelMax, char const* BattleGroundName, uint32 MapID, float Team1StartLocX, float Team1StartLocY, float Team1StartLocZ, float Team1StartLocO, float Team2StartLocX, float Team2StartLocY, float Team2StartLocZ, float Team2StartLocO, float StartMaxDist);
 
         void AddBattleGround(uint32 InstanceID, BattleGroundTypeId bgTypeId, BattleGround* BG) { m_BattleGrounds[bgTypeId][InstanceID] = BG; };
         void RemoveBattleGround(uint32 instanceID, BattleGroundTypeId bgTypeId) { m_BattleGrounds[bgTypeId].erase(instanceID); }
@@ -236,7 +236,7 @@ class BattleGroundMgr
         uint32 GetPrematureFinishTime() const;
 
         void InitAutomaticArenaPointDistribution();
-        void DistributeArenaPoints();
+        void DistributeArenaPoints() const;
         void ToggleArenaTesting();
         void ToggleTesting();
 
@@ -278,7 +278,7 @@ class BattleGroundMgr
         static BattleGroundTypeId WeekendHolidayIdToBGType(HolidayIds holiday);
         static bool IsBGWeekend(BattleGroundTypeId bgTypeId);
     private:
-        ACE_Thread_Mutex    SchedulerLock;
+        std::mutex    SchedulerLock;
         BattleMastersMap    mBattleMastersMap;
         CreatureBattleEventIndexesMap m_CreatureBattleEventIndexMap;
         GameObjectBattleEventIndexesMap m_GameObjectBattleEventIndexMap;

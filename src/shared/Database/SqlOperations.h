@@ -20,11 +20,12 @@
 #define __SQLOPERATIONS_H
 
 #include "Common.h"
-
-#include "ace/Thread_Mutex.h"
-#include "LockedQueue.h"
-#include <queue>
 #include "Utilities/Callback.h"
+
+#include <queue>
+#include <vector>
+#include <mutex>
+#include <memory>
 
 /// ---- BASE ---
 
@@ -84,27 +85,34 @@ class SqlPreparedRequest : public SqlOperation
 
 class SqlQuery;                                             /// contains a single async query
 class QueryResult;                                          /// the result of one
-class SqlResultQueue;                                       /// queue for thread sync
 class SqlQueryHolder;                                       /// groups several async quries
 class SqlQueryHolderEx;                                     /// points to a holder, added to the delay thread
 
-class SqlResultQueue : public ACE_Based::LockedQueue<MaNGOS::IQueryCallback* , ACE_Thread_Mutex>
+class SqlResultQueue
 {
+    private:
+        std::mutex m_mutex;
+        std::queue<std::unique_ptr<MaNGOS::IQueryCallback>> m_queue;
+
     public:
-        SqlResultQueue() {}
         void Update();
+        void Add(MaNGOS::IQueryCallback *);
 };
 
 class SqlQuery : public SqlOperation
 {
     private:
-        const char* m_sql;
-        MaNGOS::IQueryCallback* m_callback;
-        SqlResultQueue* m_queue;
+        std::vector<char> m_sql;
+        MaNGOS::IQueryCallback * const m_callback;
+        SqlResultQueue * const m_queue;
+
     public:
         SqlQuery(const char* sql, MaNGOS::IQueryCallback* callback, SqlResultQueue* queue)
-            : m_sql(mangos_strdup(sql)), m_callback(callback), m_queue(queue) {}
-        ~SqlQuery() { char* tofree = const_cast<char*>(m_sql); delete[] tofree; }
+            : m_sql(strlen(sql)+1), m_callback(callback), m_queue(queue)
+        {
+            memcpy(&m_sql[0], sql, m_sql.size());
+        }
+
         bool Execute(SqlConnection* conn) override;
 };
 
@@ -118,7 +126,7 @@ class SqlQueryHolder
         SqlQueryHolder() {}
         ~SqlQueryHolder();
         bool SetQuery(size_t index, const char* sql);
-        bool SetPQuery(size_t index, const char* format, ...) ATTR_PRINTF(3,4);
+        bool SetPQuery(size_t index, const char* format, ...) ATTR_PRINTF(3, 4);
         void SetSize(size_t size);
         QueryResult* GetResult(size_t index);
         void SetResult(size_t index, QueryResult* result);

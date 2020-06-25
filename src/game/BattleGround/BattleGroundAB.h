@@ -146,6 +146,10 @@ class BattleGroundABScore : public BattleGroundScore
     public:
         BattleGroundABScore(): BasesAssaulted(0), BasesDefended(0) {};
         virtual ~BattleGroundABScore() {};
+
+        uint32 GetAttr1() const { return BasesAssaulted; }
+        uint32 GetAttr2() const { return BasesDefended; }
+
         uint32 BasesAssaulted;
         uint32 BasesDefended;
 };
@@ -162,7 +166,7 @@ class BattleGroundAB : public BattleGround
         void AddPlayer(Player* plr) override;
         virtual void StartingEventOpenDoors() override;
         void RemovePlayer(Player* plr, ObjectGuid guid) override;
-        void HandleAreaTrigger(Player* source, uint32 trigger) override;
+        bool HandleAreaTrigger(Player* source, uint32 trigger) override;
         virtual void Reset() override;
         void EndBattleGround(Team winner) override;
         virtual WorldSafeLocsEntry const* GetClosestGraveYard(Player* player) override;
@@ -175,17 +179,18 @@ class BattleGroundAB : public BattleGround
         /* Nodes occupying */
         virtual void EventPlayerClickedOnFlag(Player* source, GameObject* target_obj) override;
 
+        virtual Team GetPrematureWinner() override;
+
     private:
         /* Gameobject spawning/despawning */
         void _CreateBanner(uint8 node, uint8 type, uint8 teamIndex, bool delay);
-        void _DelBanner(uint8 node, uint8 type, uint8 teamIndex);
         void _SendNodeUpdate(uint8 node);
 
         /* Creature spawning/despawning */
         // TODO: working, scripted peons spawning
         void _NodeOccupied(uint8 node, Team team);
 
-        int32 _GetNodeNameId(uint8 node);
+        int32 _GetNodeNameId(uint8 node) const;
 
         /* Nodes info:
             0: neutral
@@ -197,9 +202,9 @@ class BattleGroundAB : public BattleGround
         uint8               m_prevNodes[BG_AB_NODES_MAX];   // used for performant wordlstate-updating
         BG_AB_BannerTimer   m_BannerTimers[BG_AB_NODES_MAX];
         uint32              m_NodeTimers[BG_AB_NODES_MAX];
-        uint32              m_lastTick[BG_TEAMS_COUNT];
-        uint32              m_honorScoreTicks[BG_TEAMS_COUNT];
-        uint32              m_ReputationScoreTics[BG_TEAMS_COUNT];
+        uint32              m_lastTick[PVP_TEAM_COUNT];
+        uint32              m_honorScoreTicks[PVP_TEAM_COUNT];
+        uint32              m_ReputationScoreTics[PVP_TEAM_COUNT];
         bool                m_IsInformedNearVictory;
         uint32              m_honorTicks;
         uint32              m_ReputationTics;

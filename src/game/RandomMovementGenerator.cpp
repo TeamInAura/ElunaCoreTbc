@@ -17,7 +17,6 @@
  */
 
 #include "Creature.h"
-#include "MapManager.h"
 #include "RandomMovementGenerator.h"
 #include "Map.h"
 #include "Util.h"
@@ -25,7 +24,7 @@
 #include "movement/MoveSpline.h"
 
 template<>
-RandomMovementGenerator<Creature>::RandomMovementGenerator(const Creature& creature)
+RandomMovementGenerator<Creature>::RandomMovementGenerator(const Creature& creature): i_verticalZ(0)
 {
     float respX, respY, respZ, respO, wander_distance;
     creature.GetRespawnCoord(respX, respY, respZ, &respO, &wander_distance);
@@ -34,32 +33,32 @@ RandomMovementGenerator<Creature>::RandomMovementGenerator(const Creature& creat
     i_y = respY;
     i_z = respZ;
     i_radius = wander_distance;
-    // TODO - add support for flying mobs using some distance
-    i_verticalZ = 0.0f;
 }
 
 template<>
 void RandomMovementGenerator<Creature>::_setRandomLocation(Creature& creature)
 {
-    const float angle = rand_norm_f() * (M_PI_F * 2.0f);
-    const float range = rand_norm_f() * i_radius;
-
-    float destX = i_x + range * cos(angle);
-    float destY = i_y + range * sin(angle);
-    float destZ = i_z + frand(-1, 1) * i_verticalZ;
-    creature.UpdateAllowedPositionZ(destX, destY, destZ);
+    float destX = i_x;
+    float destY = i_y;
+    float destZ = i_z;
 
     creature.addUnitState(UNIT_STAT_ROAMING_MOVE);
 
-    Movement::MoveSplineInit init(creature);
-    init.MoveTo(destX, destY, destZ, true);
-    init.SetWalk(true);
-    init.Launch();
-
-    if (creature.CanFly())
-        i_nextMoveTime.Reset(0);
+    // check if new random position is assigned, GetReachableRandomPosition may fail
+    if (creature.GetMap()->GetReachableRandomPosition(&creature, destX, destY, destZ, i_radius))
+    {
+        Movement::MoveSplineInit init(creature);
+        init.MoveTo(destX, destY, destZ, true);
+        init.SetWalk(true);
+        init.Launch();
+        if (roll_chance_i(MOVEMENT_RANDOM_MMGEN_CHANCE_NO_BREAK))
+            i_nextMoveTime.Reset(50);
+        else
+            i_nextMoveTime.Reset(urand(3000, 10000));       // Keep a short wait time
+    }
     else
-        i_nextMoveTime.Reset(urand(500, 10000));
+        i_nextMoveTime.Reset(50);                           // Retry later
+    return;
 }
 
 template<>

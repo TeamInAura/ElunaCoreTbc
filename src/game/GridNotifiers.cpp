@@ -20,12 +20,11 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "UpdateData.h"
-#include "Item.h"
 #include "Map.h"
 #include "Transports.h"
 #include "ObjectAccessor.h"
 #include "BattleGround/BattleGroundMgr.h"
-#include "CreatureAI.h"
+#include "AI/CreatureAI.h"
 
 using namespace MaNGOS;
 
@@ -70,8 +69,8 @@ void VisibleNotifier::Notify()
     {
         // send create/outofrange packet to player (except player create updates that already sent using SendUpdateToPlayer)
         WorldPacket packet;
-        i_data.BuildPacket(&packet);
-        player.GetSession()->SendPacket(&packet);
+        i_data.BuildPacket(packet);
+        player.GetSession()->SendPacket(packet);
 
         // send out of range to other players if need
         GuidSet const& oor = i_data.GetOutOfRangeGUIDs();
@@ -162,7 +161,7 @@ void ObjectMessageDistDeliverer::Visit(CameraMapType& m)
 }
 
 template<class T>
-void ObjectUpdater::Visit(GridRefManager<T> &m)
+void ObjectUpdater::Visit(GridRefManager<T>& m)
 {
     for (typename GridRefManager<T>::iterator iter = m.begin(); iter != m.end(); ++iter)
     {

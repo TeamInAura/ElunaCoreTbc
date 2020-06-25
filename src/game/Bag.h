@@ -20,8 +20,13 @@
 #define MANGOS_BAG_H
 
 #include "Common.h"
-#include "ItemPrototype.h"
 #include "Item.h"
+
+enum InventorySlot
+{
+    NULL_BAG = 0,
+    NULL_SLOT = 255
+};
 
 // Maximum 36 Slots ( (CONTAINER_END - CONTAINER_FIELD_SLOT_1)/2
 #define MAX_BAG_SIZE 36                                     // 2.0.12
@@ -38,13 +43,12 @@ class Bag : public Item
 
         bool Create(uint32 guidlow, uint32 itemid, Player const* owner) override;
 
-        void Clear();
-        void StoreItem(uint8 slot, Item* pItem, bool update);
-        void RemoveItem(uint8 slot, bool update);
+        void StoreItem(uint8 slot, Item* pItem);
+        void RemoveItem(uint8 slot);
 
         Item* GetItemByPos(uint8 slot) const;
         Item* GetItemByEntry(uint32 item) const;
-        uint32 GetItemCount(uint32 item, Item* eItem = NULL) const;
+        uint32 GetItemCount(uint32 item, Item* eItem = nullptr) const;
 
         uint8 GetSlotByItemGUID(ObjectGuid guid) const;
         bool IsEmpty() const;

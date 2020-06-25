@@ -31,7 +31,7 @@ struct DumpTable
     DumpTableType type;
 
     // helpers
-    bool isValid() const { return name != NULL; }
+    bool isValid() const { return name != nullptr; }
 };
 
 static DumpTable dumpTables[] =
@@ -59,7 +59,7 @@ static DumpTable dumpTables[] =
     { "item_instance",                    DTT_ITEM       }, //                  <- item guids
     { "item_loot",                        DTT_ITEM_LOOT  }, //                  <- item guids
     { "item_text",                        DTT_ITEM_TEXT  },
-    { NULL,                               DTT_CHAR_TABLE }, // end marker
+    { nullptr,                            DTT_CHAR_TABLE }, // end marker
 };
 
 // Low level functions
@@ -97,7 +97,7 @@ bool findnth(std::string& str, int n, std::string::size_type& s, std::string::si
         if (e == std::string::npos)
             return false;
     }
-    while (str[e-1] == '\\');
+    while (str[e - 1] == '\\');
 
     for (int i = 1; i < n; ++i)
     {
@@ -108,7 +108,7 @@ bool findnth(std::string& str, int n, std::string::size_type& s, std::string::si
             if (e == std::string::npos)
                 return false;
         }
-        while (str[e-1] == '\\');
+        while (str[e - 1] == '\\');
     }
     return true;
 }
@@ -163,7 +163,7 @@ bool changetoknth(std::string& str, int n, const char* with, bool insert = false
     return true;
 }
 
-uint32 registerNewGuid(uint32 oldGuid, std::map<uint32, uint32> &guidMap, uint32 hiGuid)
+uint32 registerNewGuid(uint32 oldGuid, std::map<uint32, uint32>& guidMap, uint32 hiGuid)
 {
     std::map<uint32, uint32>::const_iterator itr = guidMap.find(oldGuid);
     if (itr != guidMap.end())
@@ -174,7 +174,7 @@ uint32 registerNewGuid(uint32 oldGuid, std::map<uint32, uint32> &guidMap, uint32
     return newguid;
 }
 
-bool changeGuid(std::string& str, int n, std::map<uint32, uint32> &guidMap, uint32 hiGuid, bool nonzero = false)
+bool changeGuid(std::string& str, int n, std::map<uint32, uint32>& guidMap, uint32 hiGuid, bool nonzero = false)
 {
     char chritem[20];
     uint32 oldGuid = atoi(getnth(str, n).c_str());
@@ -187,7 +187,7 @@ bool changeGuid(std::string& str, int n, std::map<uint32, uint32> &guidMap, uint
     return changenth(str, n, chritem, false, nonzero);
 }
 
-bool changetokGuid(std::string& str, int n, std::map<uint32, uint32> &guidMap, uint32 hiGuid, bool nonzero = false)
+bool changetokGuid(std::string& str, int n, std::map<uint32, uint32>& guidMap, uint32 hiGuid, bool nonzero = false)
 {
     char chritem[20];
     uint32 oldGuid = atoi(gettoknth(str, n).c_str());
@@ -214,7 +214,7 @@ std::string CreateDumpString(char const* tableName, QueryResult* result)
             ss << ", ";
 
         if (fields[i].IsNULL())
-            ss << "NULL";
+            ss << "nullptr";
         else
         {
             std::string s =  fields[i].GetCppString();
@@ -276,8 +276,8 @@ void StoreGUID(QueryResult* result, uint32 data, uint32 field, std::set<uint32>&
 // Writing - High-level functions
 void PlayerDumpWriter::DumpTableContent(std::string& dump, uint32 guid, char const* tableFrom, char const* tableTo, DumpTableType type)
 {
-    GUIDs const* guids = NULL;
-    char const* fieldname = NULL;
+    GUIDs const* guids = nullptr;
+    char const* fieldname;
 
     switch (type)
     {
@@ -324,7 +324,7 @@ void PlayerDumpWriter::DumpTableContent(std::string& dump, uint32 guid, char con
                     StoreGUID(result, 3, items); break;     // item guid collection
                 case DTT_ITEM:
                     StoreGUID(result, 0, ITEM_FIELD_ITEM_TEXT_ID, texts); break;
-                    // item text id collection
+                // item text id collection
                 case DTT_PET:
                     StoreGUID(result, 0, pets);  break;     // pet petnumber collection (character_pet.id)
                 case DTT_MAIL:
@@ -418,7 +418,7 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
     if (!fin)
         return DUMP_FILE_OPEN_ERROR;
 
-    QueryResult* result = NULL;
+    QueryResult* result;
     char newguid[20], chraccount[20], newpetid[20], currpetid[20], lastpetid[20];
 
     // make sure the same guid doesn't already exist and is safe to use
@@ -438,7 +438,7 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
 
     // normalize the name if specified and check if it exists
     if (!normalizePlayerName(name))
-        name = "";
+        name.clear();
 
     if (ObjectMgr::CheckPlayerName(name, true) == CHAR_NAME_SUCCESS)
     {
@@ -446,12 +446,12 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
         result = CharacterDatabase.PQuery("SELECT * FROM characters WHERE name = '%s'", name.c_str());
         if (result)
         {
-            name = "";                                      // use the one from the dump
+            name.clear();                                   // use the one from the dump
             delete result;
         }
     }
     else
-        name = "";
+        name.clear();
 
     // name encoded or empty
 
@@ -552,7 +552,7 @@ DumpReturn PlayerDumpReader::LoadDump(const std::string& file, uint32 account, s
                 if (!changenth(line, 2, chraccount))        // characters.account update
                     ROLLBACK(DUMP_FILE_BROKEN);
 
-                if (name == "")
+                if (name.empty())
                 {
                     // check if the original name already exists
                     name = getnth(line, 3);                 // characters.name

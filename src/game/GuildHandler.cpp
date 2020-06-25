@@ -25,9 +25,8 @@
 #include "Opcodes.h"
 #include "Guild.h"
 #include "GuildMgr.h"
-#include "GossipDef.h"
 #include "SocialMgr.h"
-#include "HookMgr.h"
+#include "LuaEngine.h"
 
 void WorldSession::HandleGuildQueryOpcode(WorldPacket& recvPacket)
 {
@@ -65,15 +64,20 @@ void WorldSession::HandleGuildCreateOpcode(WorldPacket& recvPacket)
     sGuildMgr.AddGuild(guild);
 }
 
-void WorldSession::SendGuildInvite(Player* player, bool alreadyInGuild /*= false*/)
+void WorldSession::SendGuildInvite(Player* player)
 {
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
+    if (!guild)
+        return;
+
     player->SetGuildIdInvited(GetPlayer()->GetGuildId());
+    // Put record into guildlog
+    guild->LogGuildEvent(GUILD_EVENT_LOG_INVITE_PLAYER, GetPlayer()->GetObjectGuid(), player->GetObjectGuid());
 
     WorldPacket data(SMSG_GUILD_INVITE, (8 + 10));          // guess size
     data << GetPlayer()->GetName();
     data << guild->GetName();
-    player->GetSession()->SendPacket(&data);                                  // unk
+    player->GetSession()->SendPacket(data);
 }
 
 void WorldSession::HandleGuildInviteOpcode(WorldPacket& recvPacket)
@@ -81,7 +85,7 @@ void WorldSession::HandleGuildInviteOpcode(WorldPacket& recvPacket)
     DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_INVITE");
 
     std::string Invitedname, plname;
-    Player* player = NULL;
+    Player* player = nullptr;
 
     recvPacket >> Invitedname;
 
@@ -141,7 +145,7 @@ void WorldSession::HandleGuildInviteOpcode(WorldPacket& recvPacket)
     WorldPacket data(SMSG_GUILD_INVITE, (8 + 10));          // guess size
     data << GetPlayer()->GetName();
     data << guild->GetName();
-    player->GetSession()->SendPacket(&data);
+    player->GetSession()->SendPacket(data);
 
     DEBUG_LOG("WORLD: Sent (SMSG_GUILD_INVITE)");
 }
@@ -252,7 +256,7 @@ void WorldSession::HandleGuildInfoOpcode(WorldPacket& /*recvPacket*/)
     data << uint32(guild->GetCreatedYear());
     data << uint32(guild->GetMemberSize());                 // amount of chars
     data << uint32(guild->GetAccountsNumber());             // amount of accounts
-    SendPacket(&data);
+    SendPacket(data);
 }
 
 void WorldSession::HandleGuildRosterOpcode(WorldPacket& /*recvPacket*/)
@@ -494,7 +498,7 @@ void WorldSession::HandleGuildMOTDOpcode(WorldPacket& recvPacket)
     if (!recvPacket.empty())
         recvPacket >> MOTD;
     else
-        MOTD = "";
+        MOTD.clear();
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
@@ -692,13 +696,13 @@ void WorldSession::HandleGuildDelRankOpcode(WorldPacket& /*recvPacket*/)
     guild->Roster();                                        // broadcast for tab rights update
 }
 
-void WorldSession::SendGuildCommandResult(uint32 typecmd, const std::string& str, uint32 cmdresult)
+void WorldSession::SendGuildCommandResult(uint32 typecmd, const std::string& str, uint32 cmdresult) const
 {
     WorldPacket data(SMSG_GUILD_COMMAND_RESULT, (8 + str.size() + 1));
     data << typecmd;
     data << str;
     data << cmdresult;
-    SendPacket(&data);
+    SendPacket(data);
 
     DEBUG_LOG("WORLD: Sent (SMSG_GUILD_COMMAND_RESULT)");
 }
@@ -745,10 +749,6 @@ void WorldSession::HandleSaveGuildEmblemOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    // remove fake death
-    if (GetPlayer()->hasUnitState(UNIT_STAT_DIED))
-        GetPlayer()->RemoveSpellsCausingAura(SPELL_AURA_FEIGN_DEATH);
-
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
     {
@@ -792,7 +792,7 @@ void WorldSession::HandleGuildEventLogQueryOpcode(WorldPacket& /* recvPacket */)
 
 /******  GUILD BANK  *******/
 
-void WorldSession::HandleGuildBankMoneyWithdrawn(WorldPacket & /* recv_data */)
+void WorldSession::HandleGuildBankMoneyWithdrawn(WorldPacket& /* recv_data */)
 {
     DEBUG_LOG("WORLD: Received (MSG_GUILD_BANK_MONEY_WITHDRAWN)");
 
@@ -823,7 +823,7 @@ void WorldSession::HandleGuildPermissions(WorldPacket& /* recv_data */)
                 data << uint32(pGuild->GetBankRights(rankId, uint8(i)));
                 data << uint32(pGuild->GetMemberSlotWithdrawRem(GetPlayer()->GetGUIDLow(), uint8(i)));
             }
-            SendPacket(&data);
+            SendPacket(data);
             DEBUG_LOG("WORLD: Sent (MSG_GUILD_PERMISSIONS)");
         }
     }
@@ -929,7 +929,7 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
     pGuild->LogBankEvent(GUILD_BANK_LOG_DEPOSIT_MONEY, uint8(0), GetPlayer()->GetGUIDLow(), money);
 
     // used by eluna
-    sHookMgr.OnMemberDepositMoney(pGuild, GetPlayer(), money);
+    sEluna->OnMemberDepositMoney(pGuild, GetPlayer(), money);
 
     pGuild->DisplayGuildBankTabsInfo(this);
     pGuild->DisplayGuildBankContent(this, 0);
@@ -1084,7 +1084,7 @@ void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
     // allow work with inventory only
     if (!Player::IsInventoryPos(PlayerBag, PlayerSlot) && !(PlayerBag == NULL_BAG && PlayerSlot == NULL_SLOT))
     {
-        _player->SendEquipError(EQUIP_ERR_NONE, NULL, NULL);
+        _player->SendEquipError(EQUIP_ERR_NONE, nullptr, nullptr);
         return;
     }
 
@@ -1240,9 +1240,9 @@ void WorldSession::HandleSetGuildBankTabText(WorldPacket& recv_data)
     pGuild->SetGuildBankTabText(TabId, Text);
 }
 
-void WorldSession::SendSaveGuildEmblem(uint32 msg)
+void WorldSession::SendSaveGuildEmblem(uint32 msg) const
 {
     WorldPacket data(MSG_SAVE_GUILD_EMBLEM, 4);
     data << uint32(msg);                                    // not part of guild
-    SendPacket(&data);
+    SendPacket(data);
 }

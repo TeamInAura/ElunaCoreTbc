@@ -75,7 +75,7 @@ void OutdoorPvPTF::HandlePlayerEnterZone(Player* player, bool isMainZone)
 
     // Handle the buffs
     if (player->GetTeam() == m_zoneOwner)
-        player->CastSpell(player, SPELL_AUCHINDOUN_BLESSING, true);
+        player->CastSpell(player, SPELL_AUCHINDOUN_BLESSING, TRIGGERED_OLD_TRIGGERED);
 }
 
 void OutdoorPvPTF::HandlePlayerLeaveZone(Player* player, bool isMainZone)
@@ -115,7 +115,7 @@ void OutdoorPvPTF::HandleGameObjectCreate(GameObject* go)
     }
 }
 
-void OutdoorPvPTF::HandleObjectiveComplete(uint32 eventId, std::list<Player*> players, Team team)
+void OutdoorPvPTF::HandleObjectiveComplete(uint32 eventId, const std::list<Player*>& players, Team team)
 {
     for (uint8 i = 0; i < MAX_TF_TOWERS; ++i)
     {
@@ -123,7 +123,7 @@ void OutdoorPvPTF::HandleObjectiveComplete(uint32 eventId, std::list<Player*> pl
         {
             if (terokkarTowerEvents[i][j].eventEntry == eventId)
             {
-                for (std::list<Player*>::iterator itr = players.begin(); itr != players.end(); ++itr)
+                for (std::list<Player*>::const_iterator itr = players.begin(); itr != players.end(); ++itr)
                 {
                     if ((*itr) && (*itr)->GetTeam() == team)
                         (*itr)->AreaExploredOrEventHappens(team == ALLIANCE ? QUEST_SPIRITS_OF_AUCHINDOUM_ALLIANCE : QUEST_SPIRITS_OF_AUCHINDOUM_HORDE);
